@@ -20,6 +20,7 @@ import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useBookmarkStore } from '@/store/bookmark-store';
 import type { Bookmark } from '@/types/bookmark';
+import { bookmarkHasTag, bookmarkMatchesQuery } from '@/utils/tags';
 
 type SortMode = 'newest' | 'oldest' | 'title' | 'category';
 
@@ -43,6 +44,7 @@ export default function BookmarksScreen() {
   const hydrate = useBookmarkStore((s) => s.hydrate);
 
   const [selectedCat, setSelectedCat] = useState<string | null>(null);
+  const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [sortMode, setSortMode] = useState<SortMode>('newest');
 
@@ -56,13 +58,10 @@ export default function BookmarksScreen() {
     const q = query.trim().toLowerCase();
     return bookmarks.filter((b) => {
       if (selectedCat && b.categoryId !== selectedCat) return false;
-      if (!q) return true;
-      return (
-        b.title.toLowerCase().includes(q) ||
-        b.url.toLowerCase().includes(q)
-      );
+      if (selectedTag && !bookmarkHasTag(b.tags, selectedTag)) return false;
+      return bookmarkMatchesQuery(b, q);
     });
-  }, [bookmarks, query, selectedCat]);
+  }, [bookmarks, query, selectedCat, selectedTag]);
 
   const categoryNameById = useMemo(
     () => new Map(categories.map((c) => [c.id, c.name])),
@@ -126,6 +125,21 @@ export default function BookmarksScreen() {
     return m;
   }, [bookmarks]);
 
+  const allTags = useMemo(() => {
+    const seen = new Set<string>();
+    const ordered: string[] = [];
+    for (const b of bookmarks) {
+      for (const t of b.tags ?? []) {
+        const key = t.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        ordered.push(t);
+      }
+    }
+    ordered.sort((a, b) => a.localeCompare(b, 'ko'));
+    return ordered;
+  }, [bookmarks]);
+
   if (!hasHydrated) {
     return (
       <ThemedView style={styles.center}>
@@ -143,7 +157,7 @@ export default function BookmarksScreen() {
             <TextInput
               value={query}
               onChangeText={setQuery}
-              placeholder="제목 또는 URL 검색"
+              placeholder="제목, URL, 태그 검색"
               placeholderTextColor="#888"
               style={[styles.searchInput, { color: Colors[colorScheme].text }]}
             />
@@ -163,17 +177,56 @@ export default function BookmarksScreen() {
           horizontal
           showsHorizontalScrollIndicator={false}
           data={[null, ...categories]}
-          keyExtractor={(c, idx) => (c ? c.id : `all-${idx}`)}
+          keyExtractor={(c, idx) => (c ? c.id : `all-cat-${idx}`)}
           contentContainerStyle={styles.chipRow}
           renderItem={({ item }) => (
             <CategoryChip
               category={item}
               count={item ? counts[item.id] ?? 0 : bookmarks.length}
               selected={item ? selectedCat === item.id : selectedCat === null}
-              onPress={() => setSelectedCat(item ? item.id : null)}
+              onPress={() => {
+                setSelectedCat(item ? item.id : null);
+                setSelectedTag(null);
+              }}
             />
           )}
         />
+
+        {allTags.length > 0 ? (
+          <FlatList
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            data={[null, ...allTags]}
+            keyExtractor={(t, idx) => (t !== null ? `tag-${idx}-${t}` : `all-tag-${idx}`)}
+            contentContainerStyle={styles.tagChipRow}
+            renderItem={({ item }) => {
+              const isAll = item === null;
+              const selected = isAll ? selectedTag === null : selectedTag === item;
+              const label = isAll ? '태그 전체' : item;
+              return (
+                <Pressable
+                  onPress={() => setSelectedTag(isAll ? null : item)}
+                  style={({ pressed }) => [
+                    styles.filterTagChip,
+                    {
+                      borderColor: selected ? tint : 'rgba(127,127,127,0.35)',
+                      backgroundColor: selected ? tint : 'transparent',
+                      opacity: pressed ? 0.75 : 1,
+                    },
+                  ]}>
+                  <ThemedText
+                    style={[
+                      styles.filterTagText,
+                      { color: selected ? '#fff' : Colors[colorScheme].text },
+                    ]}
+                    numberOfLines={1}>
+                    {label}
+                  </ThemedText>
+                </Pressable>
+              );
+            }}
+          />
+        ) : null}
 
         <View style={styles.sortRow}>
           {SORT_OPTIONS.map((option) => {
@@ -270,6 +323,24 @@ const styles = StyleSheet.create({
   chipRow: {
     paddingHorizontal: 14,
     paddingVertical: 8,
+  },
+  tagChipRow: {
+    paddingHorizontal: 14,
+    paddingBottom: 4,
+    gap: 8,
+  },
+  filterTagChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    marginRight: 8,
+    maxWidth: 200,
+  },
+  filterTagText: {
+    fontSize: 13,
+    fontWeight: '600',
+    lineHeight: 17,
   },
   sortRow: {
     flexDirection: 'row',

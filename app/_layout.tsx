@@ -20,6 +20,7 @@ export default function RootLayout() {
           name="add"
           options={{ presentation: 'modal', title: '북마크 추가' }}
         />
+        <Stack.Screen name="bookmark/[id]" options={{ title: '상세' }} />
       </Stack>
       <StatusBar style="auto" />
     </ThemeProvider>

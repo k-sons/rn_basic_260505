@@ -10,6 +10,8 @@ export type Bookmark = {
   title: string;
   url: string;
   categoryId: string;
+  /** 여러 개 태그(대소문자 구분 없이 중복 제거, 표시는 첫 입력 형태 유지) */
+  tags?: string[];
   thumbnailUrl?: string;
   isPinned?: boolean;
   /** 마지막으로 카드 탭 또는 외부 브라우저로 연 시각(ms) */

@@ -25,13 +25,23 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isBookmarkItem(value: unknown): value is Bookmark {
   if (!isRecord(value)) return false;
-  return (
-    typeof value.id === 'string' &&
-    typeof value.title === 'string' &&
-    typeof value.url === 'string' &&
-    typeof value.categoryId === 'string' &&
-    typeof value.createdAt === 'number'
-  );
+  if (
+    typeof value.id !== 'string' ||
+    typeof value.title !== 'string' ||
+    typeof value.url !== 'string' ||
+    typeof value.categoryId !== 'string' ||
+    typeof value.createdAt !== 'number'
+  ) {
+    return false;
+  }
+  if (
+    'tags' in value &&
+    value.tags !== undefined &&
+    (!Array.isArray(value.tags) || !value.tags.every((t) => typeof t === 'string'))
+  ) {
+    return false;
+  }
+  return true;
 }
 
 function isCategoryItem(value: unknown): value is Category {

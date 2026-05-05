@@ -63,8 +63,13 @@ export function BookmarkItem({ bookmark, category }: BookmarkItemProps) {
     openInApp(url);
   };
 
+  const handleOpenDetail = () => {
+    router.push({ pathname: '/bookmark/[id]', params: { id: bookmark.id } });
+  };
+
   const handleLongPress = () => {
     Alert.alert(shareTitle, '동작을 선택하세요', [
+      { text: '상세 보기', onPress: handleOpenDetail },
       {
         text: bookmark.isPinned ? '고정 해제' : '상단 고정',
         onPress: () => toggleBookmarkPin(bookmark.id),
@@ -123,7 +128,33 @@ export function BookmarkItem({ bookmark, category }: BookmarkItemProps) {
             <ThemedText style={[styles.catName, { color: tint }]}>{category.name}</ThemedText>
           </View>
         ) : null}
+        {(bookmark.tags?.length ?? 0) > 0 ? (
+          <View style={styles.tagRow}>
+            {(bookmark.tags ?? []).slice(0, 2).map((t) => (
+              <View key={`${bookmark.id}-${t}`} style={styles.tagMini}>
+                <ThemedText style={styles.tagMiniText} numberOfLines={1}>
+                  {t}
+                </ThemedText>
+              </View>
+            ))}
+            {(bookmark.tags?.length ?? 0) > 2 ? (
+              <ThemedText style={styles.tagMoreText}>
+                +{(bookmark.tags?.length ?? 0) - 2}
+              </ThemedText>
+            ) : null}
+          </View>
+        ) : null}
       </View>
+
+      <Pressable
+        accessibilityLabel="상세 보기"
+        onPress={(e) => {
+          e.stopPropagation();
+          handleOpenDetail();
+        }}
+        style={({ pressed }) => [styles.iconBtn, { opacity: pressed ? 0.65 : 1 }]}>
+        <IconSymbol name="info.circle" size={22} color="#888" />
+      </Pressable>
 
       <Pressable
         accessibilityLabel={bookmark.isPinned ? '고정 해제' : '상단 고정'}
@@ -134,8 +165,6 @@ export function BookmarkItem({ bookmark, category }: BookmarkItemProps) {
         style={({ pressed }) => [styles.pinBtn, { opacity: pressed ? 0.6 : 1 }]}>
         <IconSymbol name={bookmark.isPinned ? 'star.fill' : 'star'} size={22} color={pinColor} />
       </Pressable>
-
-      <IconSymbol name="arrow.up.right.square" size={20} color="#888" />
     </Pressable>
   );
 }
@@ -191,6 +220,33 @@ const styles = StyleSheet.create({
   catName: {
     fontSize: 11,
     fontWeight: '600',
+  },
+  tagRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 4,
+  },
+  tagMini: {
+    maxWidth: '46%',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    backgroundColor: 'rgba(127,127,127,0.12)',
+  },
+  tagMiniText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#666',
+  },
+  tagMoreText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#888',
+  },
+  iconBtn: {
+    padding: 6,
   },
   pinBtn: {
     padding: 6,

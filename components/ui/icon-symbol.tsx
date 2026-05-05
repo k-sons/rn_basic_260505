@@ -31,6 +31,7 @@ const MAPPING = {
   'square.and.arrow.down': 'download',
   'star.fill': 'star',
   star: 'star-border',
+  'info.circle': 'info-outline',
 } as IconMapping;
 
 /**

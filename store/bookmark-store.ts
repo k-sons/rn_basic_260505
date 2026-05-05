@@ -9,6 +9,7 @@ import {
   DEFAULT_CATEGORY_ID,
   PersistedState,
 } from '@/types/bookmark';
+import { normalizeBookmarkTags } from '@/utils/tags';
 
 export const STORAGE_KEY = '@rn_basic_260505/bookmark_store_v1';
 
@@ -48,6 +49,13 @@ function snapshot(state: BookmarkStore): PersistedState {
   return { bookmarks: state.bookmarks, categories: state.categories };
 }
 
+function normalizeBookmarksForState(bookmarks: Bookmark[]): Bookmark[] {
+  return bookmarks.map((b) => ({
+    ...b,
+    tags: normalizeBookmarkTags(b.tags),
+  }));
+}
+
 export const useBookmarkStore = create<BookmarkStore>((set, get) => ({
   bookmarks: [],
   categories: DEFAULT_CATEGORIES,
@@ -63,7 +71,7 @@ export const useBookmarkStore = create<BookmarkStore>((set, get) => ({
             ? parsed.categories
             : DEFAULT_CATEGORIES;
         set({
-          bookmarks: parsed.bookmarks ?? [],
+          bookmarks: normalizeBookmarksForState(parsed.bookmarks ?? []),
           categories,
           hasHydrated: true,
         });
@@ -84,12 +92,18 @@ export const useBookmarkStore = create<BookmarkStore>((set, get) => ({
   restoreFromBackup: async (data, mode) => {
     const categories =
       data.categories.length > 0 ? data.categories : DEFAULT_CATEGORIES;
-    const bookmarks = data.bookmarks;
+    const incoming = normalizeBookmarksForState(data.bookmarks);
     if (mode === 'overwrite') {
-      set({ bookmarks, categories });
+      set({ bookmarks: incoming, categories });
     } else {
-      const merged = mergePersistedState(snapshot(get()), { bookmarks, categories });
-      set(merged);
+      const merged = mergePersistedState(snapshot(get()), {
+        bookmarks: incoming,
+        categories,
+      });
+      set({
+        categories: merged.categories,
+        bookmarks: normalizeBookmarksForState(merged.bookmarks),
+      });
     }
     await persist(snapshot(get()));
   },
@@ -100,6 +114,7 @@ export const useBookmarkStore = create<BookmarkStore>((set, get) => ({
       createdAt: Date.now(),
       isPinned: false,
       ...input,
+      tags: normalizeBookmarkTags(input.tags),
     };
     set((s) => ({ bookmarks: [bookmark, ...s.bookmarks] }));
     persist(snapshot(get()));
@@ -107,7 +122,14 @@ export const useBookmarkStore = create<BookmarkStore>((set, get) => ({
 
   updateBookmark: (id, patch) => {
     set((s) => ({
-      bookmarks: s.bookmarks.map((b) => (b.id === id ? { ...b, ...patch } : b)),
+      bookmarks: s.bookmarks.map((b) => {
+        if (b.id !== id) return b;
+        const next = { ...b, ...patch };
+        if ('tags' in patch) {
+          next.tags = normalizeBookmarkTags(patch.tags);
+        }
+        return next;
+      }),
     }));
     persist(snapshot(get()));
   },

@@ -19,6 +19,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useBookmarkStore } from '@/store/bookmark-store';
 import { DEFAULT_CATEGORY_ID } from '@/types/bookmark';
 import { extractDomain, getFaviconUrl, normalizeUrl } from '@/utils/favicon';
+import { normalizeBookmarkTags, parseTagsFromInput } from '@/utils/tags';
 
 export default function AddBookmarkScreen() {
   const router = useRouter();
@@ -38,6 +39,8 @@ export default function AddBookmarkScreen() {
   const [url, setUrl] = useState('');
   const [thumb, setThumb] = useState('');
   const [categoryId, setCategoryId] = useState<string>(DEFAULT_CATEGORY_ID);
+  const [tags, setTags] = useState<string[]>([]);
+  const [tagDraft, setTagDraft] = useState('');
 
   useEffect(() => {
     if (!editId) return;
@@ -47,6 +50,8 @@ export default function AddBookmarkScreen() {
       setUrl(target.url);
       setThumb(target.thumbnailUrl ?? '');
       setCategoryId(target.categoryId);
+      setTags(target.tags ?? []);
+      setTagDraft('');
     }
   }, [editId, getBookmark]);
 
@@ -58,6 +63,32 @@ export default function AddBookmarkScreen() {
 
   const previewDomain = useMemo(() => extractDomain(url) ?? '', [url]);
 
+  const flushTagDraft = () => {
+    const parsed = parseTagsFromInput(tagDraft);
+    if (parsed.length) {
+      setTags((prev) => normalizeBookmarkTags([...prev, ...parsed]));
+    }
+    setTagDraft('');
+  };
+
+  const handleTagDraftChange = (text: string) => {
+    const endsWithComma = /[,，]$/u.test(text);
+    if (endsWithComma) {
+      const base = text.replace(/[,，]$/u, '');
+      const parsed = parseTagsFromInput(base);
+      if (parsed.length) {
+        setTags((prev) => normalizeBookmarkTags([...prev, ...parsed]));
+      }
+      setTagDraft('');
+      return;
+    }
+    setTagDraft(text);
+  };
+
+  const removeTag = (label: string) => {
+    setTags((prev) => prev.filter((t) => t !== label));
+  };
+
   const handleSubmit = () => {
     const trimmedUrl = url.trim();
     if (!trimmedUrl) {
@@ -68,6 +99,8 @@ export default function AddBookmarkScreen() {
       Alert.alert('URL 형식 오류', '올바른 형식의 URL이 아닙니다.');
       return;
     }
+    const finalTags = normalizeBookmarkTags([...tags, ...parseTagsFromInput(tagDraft)]);
+    setTagDraft('');
     const finalTitle = title.trim() || extractDomain(trimmedUrl) || trimmedUrl;
     const normalizedUrl = normalizeUrl(trimmedUrl);
     const payload = {
@@ -75,6 +108,7 @@ export default function AddBookmarkScreen() {
       url: normalizedUrl,
       categoryId,
       thumbnailUrl: thumb.trim() || undefined,
+      tags: finalTags,
     };
 
     if (editId) {
@@ -145,6 +179,37 @@ export default function AddBookmarkScreen() {
           </View>
 
           <View style={styles.field}>
+            <ThemedText type="defaultSemiBold">태그</ThemedText>
+            <ThemedText style={styles.hint}>
+              쉼표·공백으로 구분해 입력하거나, 쉼표 입력 시 칩으로 추가됩니다.
+            </ThemedText>
+            {tags.length > 0 ? (
+              <View style={styles.tagChipWrap}>
+                {tags.map((t) => (
+                  <Pressable
+                    key={t}
+                    onPress={() => removeTag(t)}
+                    style={({ pressed }) => [
+                      styles.tagChip,
+                      { borderColor: tint, opacity: pressed ? 0.75 : 1 },
+                    ]}>
+                    <ThemedText style={[styles.tagChipText, { color: tint }]}>{t}</ThemedText>
+                    <ThemedText style={[styles.tagChipRemove, { color: tint }]}> ×</ThemedText>
+                  </Pressable>
+                ))}
+              </View>
+            ) : null}
+            <TextInput
+              value={tagDraft}
+              onChangeText={handleTagDraftChange}
+              onBlur={flushTagDraft}
+              placeholder="예: react, 튜토리얼 영상"
+              placeholderTextColor="#888"
+              style={[styles.input, { color: textColor }]}
+            />
+          </View>
+
+          <View style={styles.field}>
             <ThemedText type="defaultSemiBold">카테고리</ThemedText>
             <View style={styles.catWrap}>
               {categories.map((c) => {
@@ -202,6 +267,34 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   field: { gap: 6 },
+  hint: {
+    fontSize: 12,
+    color: '#888',
+    lineHeight: 16,
+  },
+  tagChipWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  tagChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    backgroundColor: 'rgba(127,127,127,0.06)',
+  },
+  tagChipText: {
+    fontSize: 13,
+    fontWeight: '600',
+    maxWidth: 160,
+  },
+  tagChipRemove: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
   input: {
     borderWidth: 1,
     borderColor: '#ccc',
