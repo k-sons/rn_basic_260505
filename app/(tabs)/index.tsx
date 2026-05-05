@@ -1,7 +1,7 @@
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { Alert, AppState, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { DiaryDayCard } from '@/components/diary-day-card';
@@ -26,6 +26,15 @@ export default function DiaryHomeScreen() {
 
   useEffect(() => {
     void hydrate();
+  }, [hydrate]);
+
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        void hydrate();
+      }
+    });
+    return () => sub.remove();
   }, [hydrate]);
 
   const entry = entries[dateKey];

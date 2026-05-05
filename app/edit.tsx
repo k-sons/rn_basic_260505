@@ -1,7 +1,7 @@
 import { usePreventRemove } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'expo-image';
-import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
@@ -17,9 +17,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { downscaleDiaryImageUri } from '@/lib/downscale-diary-image';
 import { isValidDateKey, parseDateKey, toDateKey } from '@/lib/date-key';
+import { ensureGalleryPermission } from '@/lib/gallery-permission';
 import { ensurePersistableUri, persistPickedImage } from '@/lib/persist-image';
 import { useDiaryStore } from '@/store/diary-store';
+
+type PickedPreview = { uri: string; width?: number; height?: number };
 
 export default function EditDiaryScreen() {
   const router = useRouter();
@@ -48,12 +52,13 @@ export default function EditDiaryScreen() {
   }, [dateKey]);
 
   const existing = useDiaryStore((s) => s.entries[dateKey]);
+  const hydrate = useDiaryStore((s) => s.hydrate);
   const setEntry = useDiaryStore((s) => s.setEntry);
   const removeEntry = useDiaryStore((s) => s.removeEntry);
 
   const [baseline, setBaseline] = useState({ memo: '', imageKey: null as string | null });
   const [memo, setMemo] = useState('');
-  const [pickedUri, setPickedUri] = useState<string | null>(null);
+  const [picked, setPicked] = useState<PickedPreview | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
@@ -61,12 +66,20 @@ export default function EditDiaryScreen() {
     const img = existing?.imageUri?.trim() ? existing.imageUri : null;
     setBaseline({ memo: m, imageKey: img });
     setMemo(m);
-    setPickedUri(img);
+    setPicked(img ? { uri: img } : null);
   }, [dateKey, existing?.memo, existing?.imageUri]);
 
   const isDirty = useMemo(() => {
-    return memo.trim() !== baseline.memo.trim() || (pickedUri ?? '') !== (baseline.imageKey ?? '');
-  }, [memo, pickedUri, baseline.memo, baseline.imageKey]);
+    return (
+      memo.trim() !== baseline.memo.trim() || (picked?.uri ?? '') !== (baseline.imageKey ?? '')
+    );
+  }, [memo, picked?.uri, baseline.memo, baseline.imageKey]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void hydrate();
+    }, [hydrate]),
+  );
 
   usePreventRemove(isDirty && !isSaving, ({ data }) => {
     Alert.alert('저장하지 않았어요', '변경 내용을 버리고 나갈까요?', [
@@ -83,25 +96,22 @@ export default function EditDiaryScreen() {
 
   const pickImage = useCallback(async () => {
     if (isSaving) return;
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) {
-      Alert.alert(
-        '권한 필요',
-        Platform.OS === 'android'
-          ? '갤러리에서 사진을 고르려면 저장소·사진 권한을 허용해 주세요.'
-          : '사진 라이브러리 접근을 허용해 주세요.',
-      );
-      return;
-    }
+    const ok = await ensureGalleryPermission();
+    if (!ok) return;
 
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       allowsEditing: false,
-      quality: 0.85,
+      quality: Platform.OS === 'android' ? 0.8 : 0.85,
     });
 
     if (!result.canceled && result.assets[0]?.uri) {
-      setPickedUri(result.assets[0].uri);
+      const a = result.assets[0];
+      setPicked({
+        uri: a.uri,
+        width: a.width ?? undefined,
+        height: a.height ?? undefined,
+      });
     }
   }, [isSaving]);
 
@@ -109,9 +119,18 @@ export default function EditDiaryScreen() {
     setIsSaving(true);
     try {
       let imageUri = '';
-      if (pickedUri?.trim()) {
-        const stableWeb = Platform.OS === 'web' ? await ensurePersistableUri(pickedUri) : pickedUri;
-        imageUri = await persistPickedImage(stableWeb, dateKey);
+      if (picked?.uri.trim()) {
+        const { uri: pu, width: iw, height: ih } = picked;
+        const rawPick = pu.trim();
+        const resizedNative =
+          Platform.OS !== 'web'
+            ? await downscaleDiaryImageUri(rawPick, iw, ih)
+            : rawPick;
+        const stableUri =
+          Platform.OS === 'web'
+            ? await ensurePersistableUri(rawPick)
+            : resizedNative;
+        imageUri = await persistPickedImage(stableUri, dateKey);
       }
 
       const result = await setEntry(dateKey, {
@@ -140,7 +159,7 @@ export default function EditDiaryScreen() {
     } finally {
       setIsSaving(false);
     }
-  }, [dateKey, memo, pickedUri, router, setEntry]);
+  }, [dateKey, memo, picked, router, setEntry]);
 
   const confirmDeleteSaved = useCallback(() => {
     if (!hasSavedEntry || isSaving) return;
@@ -187,6 +206,11 @@ export default function EditDiaryScreen() {
             ? '웹에서는 선택한 이미지를 data URL로 저장합니다. 용량이 크면 브라우저 저장소 부담이 커질 수 있어요.'
             : '선택한 사진은 앱 저장 공간으로 복사해 두어 재실행 후에도 안정적으로 불러옵니다.'}
         </ThemedText>
+        {Platform.OS === 'android' ? (
+          <ThemedText style={[styles.hint, { color: palette.icon }]}>
+            Android에서는 큰 사진을 저장 전에 길이를 줄여, 저사양 기기에서도 디코딩·메모리 부담을 덜도록 했습니다.
+          </ThemedText>
+        ) : null}
 
         <View style={styles.pickRow}>
           <Pressable
@@ -201,8 +225,8 @@ export default function EditDiaryScreen() {
             ]}>
             <ThemedText type="defaultSemiBold">사진 선택</ThemedText>
           </Pressable>
-          {pickedUri ? (
-            <Pressable disabled={isSaving} onPress={() => setPickedUri(null)} hitSlop={8}>
+          {picked ? (
+            <Pressable disabled={isSaving} onPress={() => setPicked(null)} hitSlop={8}>
               <ThemedText style={[styles.removePhoto, { color: palette.tint, opacity: isSaving ? 0.45 : 1 }]}>
                 사진 제거
               </ThemedText>
@@ -210,9 +234,9 @@ export default function EditDiaryScreen() {
           ) : null}
         </View>
 
-        {pickedUri ? (
+        {picked ? (
           <View style={[styles.previewWrap, { backgroundColor: scheme === 'dark' ? '#121518' : '#e8ecf0' }]}>
-            <Image source={{ uri: pickedUri }} style={styles.preview} contentFit="cover" transition={120} />
+            <Image source={{ uri: picked.uri }} style={styles.preview} contentFit="cover" transition={120} />
           </View>
         ) : null}
 
