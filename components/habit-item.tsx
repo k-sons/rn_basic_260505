@@ -13,6 +13,7 @@ import Animated, {
 import { ThemedText } from '@/components/themed-text';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+// todayKey 함수와 Habit 타입을 '@/types/habit'에서 가져옵니다.
 import { todayKey, type Habit } from '@/types/habit';
 
 type Props = {
@@ -38,8 +39,8 @@ export function HabitItem({ habit, onToggle, onEdit }: Props) {
   }));
 
   const checkBoxStyle = useAnimatedStyle(() => ({
-    backgroundColor: checkProgress.value === 1 ? palette.tint : 'transparent',
-    borderColor: checkProgress.value === 1 ? palette.tint : palette.icon,
+    backgroundColor: checkProgress.value === 1 ? palette.success : 'transparent',
+    borderColor: checkProgress.value === 1 ? palette.success : palette.icon,
     transform: [{ scale: 0.9 + checkProgress.value * 0.1 }],
   }));
 
@@ -64,8 +65,9 @@ export function HabitItem({ habit, onToggle, onEdit }: Props) {
         style={({ pressed }) => [
           styles.card,
           {
-            backgroundColor: colorScheme === 'dark' ? '#1f2224' : '#f6f7f9',
-            opacity: pressed ? 0.85 : 1,
+            backgroundColor: checked ? palette.successSoft : palette.surface,
+            borderColor: checked ? palette.success : palette.border,
+            opacity: pressed ? 0.9 : 1,
           },
         ]}>
         <Animated.View style={[styles.checkbox, checkBoxStyle]}>
@@ -73,11 +75,17 @@ export function HabitItem({ habit, onToggle, onEdit }: Props) {
         </Animated.View>
 
         <View style={styles.body}>
-          <ThemedText type="defaultSemiBold" style={checked ? styles.doneText : undefined}>
-            {habit.emoji} {habit.name}
+          <ThemedText
+            type="defaultSemiBold"
+            style={[styles.title, checked && styles.doneText]}>
+            {habit.emoji}  {habit.name}
           </ThemedText>
-          <ThemedText style={[styles.subText, { color: palette.icon }]}>
-            {checked ? '오늘 완료!' : '길게 눌러 수정'}
+          <ThemedText
+            style={[
+              styles.subText,
+              { color: checked ? palette.success : palette.icon },
+            ]}>
+            {checked ? '오늘 완료!' : '탭하여 체크 · 길게 눌러 수정'}
           </ThemedText>
         </View>
 
@@ -91,15 +99,17 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 14,
-    borderRadius: 14,
-    marginBottom: 10,
-    gap: 12,
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 12,
+    gap: 14,
+    borderWidth: 1,
+    elevation: 1,
   },
   checkbox: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
@@ -107,12 +117,15 @@ const styles = StyleSheet.create({
   body: {
     flex: 1,
   },
+  title: {
+    fontSize: 16,
+  },
   subText: {
     fontSize: 12,
-    marginTop: 2,
+    marginTop: 3,
   },
   doneText: {
     textDecorationLine: 'line-through',
-    opacity: 0.6,
+    opacity: 0.55,
   },
 });
