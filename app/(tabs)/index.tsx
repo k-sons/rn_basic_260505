@@ -4,6 +4,7 @@ import {
   ActivityIndicator,
   FlatList,
   Pressable,
+  SectionList,
   StyleSheet,
   TextInput,
   View,
@@ -18,8 +19,11 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useBookmarkStore } from '@/store/bookmark-store';
+import type { Bookmark } from '@/types/bookmark';
 
 type SortMode = 'newest' | 'oldest' | 'title' | 'category';
+
+const MAX_RECENT_OPENED = 10;
 
 const SORT_OPTIONS: { label: string; value: SortMode }[] = [
   { label: '최신순', value: 'newest' },
@@ -48,10 +52,9 @@ export default function BookmarksScreen() {
     }
   }, [hasHydrated, hydrate]);
 
-  const filtered = useMemo(() => {
+  const matchedBookmarks = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const categoryNameById = new Map(categories.map((c) => [c.id, c.name]));
-    const matched = bookmarks.filter((b) => {
+    return bookmarks.filter((b) => {
       if (selectedCat && b.categoryId !== selectedCat) return false;
       if (!q) return true;
       return (
@@ -59,8 +62,35 @@ export default function BookmarksScreen() {
         b.url.toLowerCase().includes(q)
       );
     });
+  }, [bookmarks, query, selectedCat]);
 
-    return [...matched].sort((a, b) => {
+  const categoryNameById = useMemo(
+    () => new Map(categories.map((c) => [c.id, c.name])),
+    [categories]
+  );
+
+  /** 최근 열어본: 열린 적 있는 항목만, lastOpenedAt 기준 내림차순(동시각이면 제목). 고정 여부보다 ‘최근’이 우선. */
+  const recentOpened = useMemo(() => {
+    return [...matchedBookmarks]
+      .filter((b) => typeof b.lastOpenedAt === 'number')
+      .sort((a, b) => {
+        const dt = (b.lastOpenedAt ?? 0) - (a.lastOpenedAt ?? 0);
+        if (dt !== 0) return dt;
+        return a.title.localeCompare(b.title, 'ko');
+      })
+      .slice(0, MAX_RECENT_OPENED);
+  }, [matchedBookmarks]);
+
+  const recentOpenedIds = useMemo(
+    () => new Set(recentOpened.map((b) => b.id)),
+    [recentOpened]
+  );
+
+  /** 전체 목록: 최근 구역에 올린 id는 빼서 중복 방지. 정렬은 기존대로 고정 → 선택 정렬 */
+  const mainBookmarks = useMemo(() => {
+    const rest = matchedBookmarks.filter((b) => !recentOpenedIds.has(b.id));
+    return [...rest].sort((a, b) => {
+      if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
       if (sortMode === 'oldest') return a.createdAt - b.createdAt;
       if (sortMode === 'title') return a.title.localeCompare(b.title, 'ko');
       if (sortMode === 'category') {
@@ -72,7 +102,21 @@ export default function BookmarksScreen() {
       }
       return b.createdAt - a.createdAt;
     });
-  }, [bookmarks, categories, query, selectedCat, sortMode]);
+  }, [matchedBookmarks, categoryNameById, sortMode, recentOpenedIds]);
+
+  const listSections = useMemo(() => {
+    const sections: { title: string; data: Bookmark[] }[] = [];
+    if (recentOpened.length > 0) {
+      sections.push({ title: '최근 열어본', data: recentOpened });
+    }
+    if (recentOpened.length === 0 || mainBookmarks.length > 0) {
+      sections.push({
+        title: recentOpened.length > 0 ? '전체' : '',
+        data: mainBookmarks,
+      });
+    }
+    return sections;
+  }, [recentOpened, mainBookmarks]);
 
   const counts = useMemo(() => {
     const m: Record<string, number> = {};
@@ -158,10 +202,18 @@ export default function BookmarksScreen() {
           })}
         </View>
 
-        <FlatList
-          data={filtered}
+        <SectionList
+          sections={listSections}
           keyExtractor={(b) => b.id}
+          stickySectionHeadersEnabled={false}
           contentContainerStyle={styles.listContent}
+          renderSectionHeader={({ section }) =>
+            section.title ? (
+              <View style={styles.sectionHeader}>
+                <ThemedText type="subtitle">{section.title}</ThemedText>
+              </View>
+            ) : null
+          }
           ListEmptyComponent={
             <View style={styles.empty}>
               <ThemedText type="subtitle">아직 북마크가 없어요</ThemedText>
@@ -242,6 +294,11 @@ const styles = StyleSheet.create({
     paddingTop: 4,
     paddingBottom: 24,
     flexGrow: 1,
+  },
+  sectionHeader: {
+    paddingTop: 8,
+    paddingBottom: 6,
+    backgroundColor: 'transparent',
   },
   empty: {
     flex: 1,

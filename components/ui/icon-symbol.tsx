@@ -25,8 +25,10 @@ const MAPPING = {
   trash: 'delete',
   'arrow.up.right.square': 'open-in-new',
   xmark: 'close',
-  'magnifyingglass': 'search',
-  'pencil': 'edit',
+  magnifyingglass: 'search',
+  pencil: 'edit',
+  'star.fill': 'star',
+  star: 'star-border',
 } as IconMapping;
 
 /**

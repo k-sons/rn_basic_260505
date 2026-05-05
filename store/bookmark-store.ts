@@ -23,6 +23,8 @@ type BookmarkStore = PersistedState & {
   addBookmark: (input: Omit<Bookmark, 'id' | 'createdAt'>) => void;
   updateBookmark: (id: string, patch: Partial<Omit<Bookmark, 'id' | 'createdAt'>>) => void;
   removeBookmark: (id: string) => void;
+  toggleBookmarkPin: (id: string) => void;
+  markBookmarkOpened: (id: string) => void;
   getBookmark: (id: string) => Bookmark | undefined;
 
   addCategory: (input: { name: string; color: string }) => void;
@@ -82,6 +84,7 @@ export const useBookmarkStore = create<BookmarkStore>((set, get) => ({
     const bookmark: Bookmark = {
       id: generateId('bm'),
       createdAt: Date.now(),
+      isPinned: false,
       ...input,
     };
     set((s) => ({ bookmarks: [bookmark, ...s.bookmarks] }));
@@ -97,6 +100,23 @@ export const useBookmarkStore = create<BookmarkStore>((set, get) => ({
 
   removeBookmark: (id) => {
     set((s) => ({ bookmarks: s.bookmarks.filter((b) => b.id !== id) }));
+    persist(snapshot(get()));
+  },
+
+  toggleBookmarkPin: (id) => {
+    set((s) => ({
+      bookmarks: s.bookmarks.map((b) =>
+        b.id === id ? { ...b, isPinned: !b.isPinned } : b
+      ),
+    }));
+    persist(snapshot(get()));
+  },
+
+  markBookmarkOpened: (id) => {
+    const t = Date.now();
+    set((s) => ({
+      bookmarks: s.bookmarks.map((b) => (b.id === id ? { ...b, lastOpenedAt: t } : b)),
+    }));
     persist(snapshot(get()));
   },
 

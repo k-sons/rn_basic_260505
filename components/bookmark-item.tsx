@@ -2,7 +2,7 @@ import { Image } from 'expo-image';
 import * as Linking from 'expo-linking';
 import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { Alert, Pressable, StyleSheet, View } from 'react-native';
+import { Alert, Pressable, Share, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -32,22 +32,51 @@ async function openExternal(url: string) {
   }
 }
 
+async function shareBookmark(title: string, url: string) {
+  try {
+    await Share.share({
+      title,
+      message: `${title}\n${url}`,
+      url,
+    });
+  } catch (e) {
+    console.warn('[bookmark] share failed', e);
+    Alert.alert('공유 실패', '이 환경에서는 공유를 실행할 수 없습니다.');
+  }
+}
+
 export function BookmarkItem({ bookmark, category }: BookmarkItemProps) {
   const router = useRouter();
   const removeBookmark = useBookmarkStore((s) => s.removeBookmark);
+  const toggleBookmarkPin = useBookmarkStore((s) => s.toggleBookmarkPin);
+  const markBookmarkOpened = useBookmarkStore((s) => s.markBookmarkOpened);
 
   const url = normalizeUrl(bookmark.url);
   const domain = extractDomain(url) ?? bookmark.url;
   const thumbnail = bookmark.thumbnailUrl?.trim() || getFaviconUrl(url) || undefined;
   const tint = category?.color ?? '#888';
+  const pinColor = bookmark.isPinned ? '#f39c12' : '#888';
+  const shareTitle = bookmark.title || domain;
 
   const handlePress = () => {
+    markBookmarkOpened(bookmark.id);
     openInApp(url);
   };
 
   const handleLongPress = () => {
-    Alert.alert(bookmark.title || domain, '동작을 선택하세요', [
-      { text: '외부 브라우저로 열기', onPress: () => openExternal(url) },
+    Alert.alert(shareTitle, '동작을 선택하세요', [
+      {
+        text: bookmark.isPinned ? '고정 해제' : '상단 고정',
+        onPress: () => toggleBookmarkPin(bookmark.id),
+      },
+      {
+        text: '외부 브라우저로 열기',
+        onPress: () => {
+          markBookmarkOpened(bookmark.id);
+          openExternal(url);
+        },
+      },
+      { text: '공유', onPress: () => shareBookmark(shareTitle, url) },
       { text: '편집', onPress: () => router.push({ pathname: '/add', params: { id: bookmark.id } }) },
       {
         text: '삭제',
@@ -82,6 +111,7 @@ export function BookmarkItem({ bookmark, category }: BookmarkItemProps) {
 
       <View style={styles.body}>
         <ThemedText type="defaultSemiBold" numberOfLines={1}>
+          {bookmark.isPinned ? '★ ' : ''}
           {bookmark.title || domain}
         </ThemedText>
         <ThemedText style={styles.domain} numberOfLines={1}>
@@ -94,6 +124,16 @@ export function BookmarkItem({ bookmark, category }: BookmarkItemProps) {
           </View>
         ) : null}
       </View>
+
+      <Pressable
+        accessibilityLabel={bookmark.isPinned ? '고정 해제' : '상단 고정'}
+        onPress={(event) => {
+          event.stopPropagation();
+          toggleBookmarkPin(bookmark.id);
+        }}
+        style={({ pressed }) => [styles.pinBtn, { opacity: pressed ? 0.6 : 1 }]}>
+        <IconSymbol name={bookmark.isPinned ? 'star.fill' : 'star'} size={22} color={pinColor} />
+      </Pressable>
 
       <IconSymbol name="arrow.up.right.square" size={20} color="#888" />
     </Pressable>
@@ -151,5 +191,8 @@ const styles = StyleSheet.create({
   catName: {
     fontSize: 11,
     fontWeight: '600',
+  },
+  pinBtn: {
+    padding: 6,
   },
 });
