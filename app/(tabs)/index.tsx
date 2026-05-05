@@ -1,98 +1,151 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { useRouter } from 'expo-router';
+import { useEffect, useMemo } from 'react';
+import { FlatList, Pressable, StyleSheet, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
+import { HabitItem } from '@/components/habit-item';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+import { Colors } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useHabitStore } from '@/store/habit-store';
+import { todayKey, type Habit } from '@/types/habit';
 
-export default function HomeScreen() {
+export default function TodayScreen() {
+  const router = useRouter();
+  const colorScheme = useColorScheme() ?? 'light';
+  const palette = Colors[colorScheme];
+
+  const habits = useHabitStore((s) => s.habits);
+  const hydrated = useHabitStore((s) => s.hydrated);
+  const hydrate = useHabitStore((s) => s.hydrate);
+  const toggleToday = useHabitStore((s) => s.toggleToday);
+
+  useEffect(() => {
+    if (!hydrated) hydrate();
+  }, [hydrated, hydrate]);
+
+  const todayDoneCount = useMemo(() => {
+    const key = todayKey();
+    return habits.filter((h) => h.history[key]).length;
+  }, [habits]);
+
+  const total = habits.length;
+  const progress = total === 0 ? 0 : Math.round((todayDoneCount / total) * 100);
+
+  const handleEdit = (habit: Habit) => {
+    router.push({ pathname: '/modal', params: { id: habit.id } });
+  };
+
+  const handleAdd = () => {
+    router.push('/modal');
+  };
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+    <ThemedView style={styles.container}>
+      <SafeAreaView edges={['top']} style={styles.safe}>
+        <View style={styles.header}>
+          <View style={{ flex: 1 }}>
+            <ThemedText type="title">오늘의 습관</ThemedText>
+            <ThemedText style={[styles.headerSub, { color: palette.icon }]}>
+              {total === 0
+                ? '아직 습관이 없어요. 추가해보세요!'
+                : `${todayDoneCount} / ${total} 완료 · ${progress}%`}
+            </ThemedText>
+          </View>
+          <Pressable
+            onPress={handleAdd}
+            style={({ pressed }) => [
+              styles.addBtn,
+              { backgroundColor: palette.tint, opacity: pressed ? 0.85 : 1 },
+            ]}>
+            <MaterialIcons name="add" size={24} color="#fff" />
+          </Pressable>
+        </View>
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+        <View
+          style={[
+            styles.progressTrack,
+            { backgroundColor: colorScheme === 'dark' ? '#2a2d2f' : '#e6e8eb' },
+          ]}>
+          <View
+            style={[
+              styles.progressFill,
+              { width: `${progress}%`, backgroundColor: palette.tint },
+            ]}
+          />
+        </View>
+
+        <FlatList
+          data={habits}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.list}
+          renderItem={({ item }) => (
+            <HabitItem habit={item} onToggle={toggleToday} onEdit={handleEdit} />
+          )}
+          ListEmptyComponent={
+            <View style={styles.empty}>
+              <MaterialIcons name="emoji-events" size={56} color={palette.icon} />
+              <ThemedText style={[styles.emptyText, { color: palette.icon }]}>
+                + 버튼으로 첫 습관을 추가하세요
+              </ThemedText>
+            </View>
+          }
+        />
+      </SafeAreaView>
+    </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
+  container: {
+    flex: 1,
+  },
+  safe: {
+    flex: 1,
+    paddingHorizontal: 16,
+  },
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    paddingTop: 16,
+    paddingBottom: 12,
+    gap: 12,
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  headerSub: {
+    marginTop: 4,
+    fontSize: 13,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  addBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  progressTrack: {
+    height: 6,
+    borderRadius: 3,
+    marginBottom: 16,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  list: {
+    paddingBottom: 24,
+    flexGrow: 1,
+  },
+  empty: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 80,
+    gap: 12,
+  },
+  emptyText: {
+    fontSize: 14,
   },
 });
