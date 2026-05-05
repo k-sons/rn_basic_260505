@@ -1,6 +1,6 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import * as Haptics from 'expo-haptics';
-import { useEffect } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import Animated, {
   useAnimatedStyle,
@@ -13,19 +13,20 @@ import Animated, {
 import { ThemedText } from '@/components/themed-text';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-// todayKey 함수와 Habit 타입을 '@/types/habit'에서 가져옵니다.
-import { todayKey, type Habit } from '@/types/habit';
+import { getCurrentStreak, todayKey, type Habit } from '@/types/habit';
 
 type Props = {
   habit: Habit;
   onToggle: (id: string) => void;
   onEdit: (habit: Habit) => void;
+  dragHandle?: ReactNode;
 };
 
-export function HabitItem({ habit, onToggle, onEdit }: Props) {
+export function HabitItem({ habit, onToggle, onEdit, dragHandle }: Props) {
   const colorScheme = useColorScheme() ?? 'light';
   const palette = Colors[colorScheme];
   const checked = !!habit.history[todayKey()];
+  const currentStreak = getCurrentStreak(habit.history);
 
   const scale = useSharedValue(1);
   const checkProgress = useSharedValue(checked ? 1 : 0);
@@ -59,38 +60,40 @@ export function HabitItem({ habit, onToggle, onEdit }: Props) {
 
   return (
     <Animated.View style={cardStyle}>
-      <Pressable
-        onPress={handlePress}
-        onLongPress={() => onEdit(habit)}
-        style={({ pressed }) => [
+      <View
+        style={[
           styles.card,
           {
             backgroundColor: checked ? palette.successSoft : palette.surface,
             borderColor: checked ? palette.success : palette.border,
-            opacity: pressed ? 0.9 : 1,
           },
         ]}>
-        <Animated.View style={[styles.checkbox, checkBoxStyle]}>
-          {checked && <MaterialIcons name="check" size={18} color="#fff" />}
-        </Animated.View>
+        <Pressable
+          onPress={handlePress}
+          onLongPress={() => onEdit(habit)}
+          style={({ pressed }) => [styles.pressArea, { opacity: pressed ? 0.9 : 1 }]}>
+          <Animated.View style={[styles.checkbox, checkBoxStyle]}>
+            {checked && <MaterialIcons name="check" size={18} color="#fff" />}
+          </Animated.View>
 
-        <View style={styles.body}>
-          <ThemedText
-            type="defaultSemiBold"
-            style={[styles.title, checked && styles.doneText]}>
-            {habit.emoji}  {habit.name}
-          </ThemedText>
-          <ThemedText
-            style={[
-              styles.subText,
-              { color: checked ? palette.success : palette.icon },
-            ]}>
-            {checked ? '오늘 완료!' : '탭하여 체크 · 길게 눌러 수정'}
-          </ThemedText>
-        </View>
+          <View style={styles.body}>
+            <ThemedText
+              type="defaultSemiBold"
+              style={[styles.title, checked && styles.doneText]}>
+              {habit.emoji}  {habit.name}
+            </ThemedText>
+            <ThemedText
+              style={[
+                styles.subText,
+                { color: checked ? palette.success : palette.icon },
+              ]}>
+              {checked ? `${currentStreak}일째 연속 달성` : '탭 체크 · 길게 수정 · 핸들 이동'}
+            </ThemedText>
+          </View>
+        </Pressable>
 
-        <MaterialIcons name="chevron-right" size={22} color={palette.icon} />
-      </Pressable>
+        {dragHandle ?? <MaterialIcons name="chevron-right" size={22} color={palette.icon} />}
+      </View>
     </Animated.View>
   );
 }
@@ -105,6 +108,12 @@ const styles = StyleSheet.create({
     gap: 14,
     borderWidth: 1,
     elevation: 1,
+  },
+  pressArea: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
   },
   checkbox: {
     width: 30,

@@ -8,7 +8,7 @@ import { ThemedView } from '@/components/themed-view';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useHabitStore } from '@/store/habit-store';
-import { todayKey } from '@/types/habit';
+import { getBestStreak, getCurrentStreak, todayKey } from '@/types/habit';
 
 const DAYS = 7;
 const WEEKDAY = ['일', '월', '화', '수', '목', '금', '토'];
@@ -38,6 +38,16 @@ export default function StatsScreen() {
 
   const todayRate = last7[last7.length - 1]?.rate ?? 0;
 
+  const streakSummary = useMemo(() => {
+    return habits.reduce(
+      (summary, habit) => ({
+        totalCurrent: summary.totalCurrent + getCurrentStreak(habit.history),
+        best: Math.max(summary.best, getBestStreak(habit.history)),
+      }),
+      { totalCurrent: 0, best: 0 }
+    );
+  }, [habits]);
+
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView edges={['top']} style={styles.safe}>
@@ -50,6 +60,26 @@ export default function StatsScreen() {
             <SummaryCard label="오늘" value={`${todayRate}%`} palette={palette} />
             <SummaryCard label="7일 평균" value={`${avgRate}%`} palette={palette} />
             <SummaryCard label="습관 수" value={`${habits.length}`} palette={palette} />
+          </View>
+
+          <View style={styles.streakCard}>
+            <View>
+              <ThemedText style={[styles.summaryLabel, { color: palette.icon }]}>
+                현재 전체 연속
+              </ThemedText>
+              <ThemedText type="title" style={styles.streakValue}>
+                {streakSummary.totalCurrent}일
+              </ThemedText>
+            </View>
+            <View style={styles.streakDivider} />
+            <View>
+              <ThemedText style={[styles.summaryLabel, { color: palette.icon }]}>
+                최고 연속
+              </ThemedText>
+              <ThemedText type="title" style={styles.streakValue}>
+                {streakSummary.best}일
+              </ThemedText>
+            </View>
           </View>
 
           <View style={styles.chartCard}>
@@ -129,6 +159,25 @@ const styles = StyleSheet.create({
   },
   summaryLabel: { fontSize: 12 },
   summaryValue: { fontSize: 24, marginTop: 4 },
+  streakCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    backgroundColor: 'rgba(127,127,127,0.08)',
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 20,
+  },
+  streakValue: {
+    fontSize: 24,
+    marginTop: 4,
+    textAlign: 'center',
+  },
+  streakDivider: {
+    width: 1,
+    height: 42,
+    backgroundColor: 'rgba(127,127,127,0.22)',
+  },
   chartCard: {
     backgroundColor: 'rgba(127,127,127,0.08)',
     borderRadius: 14,
