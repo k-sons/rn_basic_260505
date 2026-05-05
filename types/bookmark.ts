@@ -25,3 +25,9 @@ export const DEFAULT_CATEGORIES: Category[] = [
 ];
 
 export const DEFAULT_CATEGORY_ID = 'cat-etc';
+
+/** AsyncStorage에 저장되는 북마크 스토어 스냅샷 */
+export type PersistedState = {
+  bookmarks: Bookmark[];
+  categories: Category[];
+};

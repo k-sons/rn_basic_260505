@@ -27,6 +27,8 @@ const MAPPING = {
   xmark: 'close',
   magnifyingglass: 'search',
   pencil: 'edit',
+  'square.and.arrow.up': 'upload',
+  'square.and.arrow.down': 'download',
   'star.fill': 'star',
   star: 'star-border',
 } as IconMapping;

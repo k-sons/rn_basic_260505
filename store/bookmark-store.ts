@@ -1,24 +1,25 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 
+import { mergePersistedState } from '@/lib/bookmark-backup';
 import {
   Bookmark,
   Category,
   DEFAULT_CATEGORIES,
   DEFAULT_CATEGORY_ID,
+  PersistedState,
 } from '@/types/bookmark';
 
-const STORAGE_KEY = '@rn_basic_260505/bookmark_store_v1';
-
-type PersistedState = {
-  bookmarks: Bookmark[];
-  categories: Category[];
-};
+export const STORAGE_KEY = '@rn_basic_260505/bookmark_store_v1';
 
 type BookmarkStore = PersistedState & {
   hasHydrated: boolean;
   hydrate: () => Promise<void>;
   resetAll: () => Promise<void>;
+  restoreFromBackup: (
+    data: PersistedState,
+    mode: 'overwrite' | 'merge'
+  ) => Promise<void>;
 
   addBookmark: (input: Omit<Bookmark, 'id' | 'createdAt'>) => void;
   updateBookmark: (id: string, patch: Partial<Omit<Bookmark, 'id' | 'createdAt'>>) => void;
@@ -77,6 +78,19 @@ export const useBookmarkStore = create<BookmarkStore>((set, get) => ({
 
   resetAll: async () => {
     set({ bookmarks: [], categories: DEFAULT_CATEGORIES });
+    await persist(snapshot(get()));
+  },
+
+  restoreFromBackup: async (data, mode) => {
+    const categories =
+      data.categories.length > 0 ? data.categories : DEFAULT_CATEGORIES;
+    const bookmarks = data.bookmarks;
+    if (mode === 'overwrite') {
+      set({ bookmarks, categories });
+    } else {
+      const merged = mergePersistedState(snapshot(get()), { bookmarks, categories });
+      set(merged);
+    }
     await persist(snapshot(get()));
   },
 
