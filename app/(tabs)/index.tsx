@@ -1,7 +1,7 @@
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Platform, Pressable, StyleSheet, View } from 'react-native';
+import { Alert, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { DiaryDayCard } from '@/components/diary-day-card';
@@ -15,10 +15,12 @@ import { useDiaryStore } from '@/store/diary-store';
 export default function DiaryHomeScreen() {
   const scheme = useColorScheme() ?? 'light';
   const tint = Colors[scheme].tint;
+  const destructive = scheme === 'dark' ? '#ff8a80' : '#c62828';
 
   const hydrated = useDiaryStore((s) => s.hydrated);
   const hydrate = useDiaryStore((s) => s.hydrate);
   const entries = useDiaryStore((s) => s.entries);
+  const removeEntry = useDiaryStore((s) => s.removeEntry);
 
   const [dateKey, setDateKey] = useState(() => toDateKey(new Date()));
 
@@ -56,6 +58,27 @@ export default function DiaryHomeScreen() {
     router.push({ pathname: '/edit', params: { date: dateKey } });
   }, [dateKey]);
 
+  const canDelete = Boolean(entry && (entry.memo.trim() || entry.imageUri.trim()));
+
+  const confirmDeleteDay = useCallback(() => {
+    if (!canDelete) return;
+    Alert.alert('일기 삭제', '이 날짜의 저장된 일기를 삭제할까요? 되돌릴 수 없습니다.', [
+      { text: '취소', style: 'cancel', onPress: () => {} },
+      {
+        text: '삭제',
+        style: 'destructive',
+        onPress: () => {
+          void (async () => {
+            const result = await removeEntry(dateKey);
+            if (!result.ok) {
+              Alert.alert('삭제 실패', result.error.message ?? '잠시 후 다시 시도해 주세요.');
+            }
+          })();
+        },
+      },
+    ]);
+  }, [canDelete, dateKey, removeEntry]);
+
   if (!hydrated) {
     return (
       <SafeAreaView style={[styles.safe, { backgroundColor: Colors[scheme].background }]}>
@@ -92,6 +115,12 @@ export default function DiaryHomeScreen() {
             이 날짜 편집
           </ThemedText>
         </Pressable>
+
+        {canDelete ? (
+          <Pressable onPress={confirmDeleteDay} style={styles.deleteLink}>
+            <ThemedText style={[styles.deleteLinkText, { color: destructive }]}>이 날 일기 삭제</ThemedText>
+          </Pressable>
+        ) : null}
       </View>
     </SafeAreaView>
   );
@@ -122,6 +151,7 @@ const styles = StyleSheet.create({
   footer: {
     paddingHorizontal: 20,
     paddingVertical: 16,
+    gap: 12,
   },
   primaryBtn: {
     paddingVertical: 14,
@@ -132,5 +162,13 @@ const styles = StyleSheet.create({
   primaryBtnText: {
     fontSize: 17,
     fontWeight: '700',
+  },
+  deleteLink: {
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  deleteLinkText: {
+    fontSize: 15,
+    fontWeight: '600',
   },
 });
