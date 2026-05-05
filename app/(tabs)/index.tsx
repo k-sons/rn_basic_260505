@@ -1,98 +1,257 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import { useRouter } from 'expo-router';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  StyleSheet,
+  TextInput,
+  View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
+import { BookmarkItem } from '@/components/bookmark-item';
+import { CategoryChip } from '@/components/category-chip';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+import { IconSymbol } from '@/components/ui/icon-symbol';
+import { Colors } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useBookmarkStore } from '@/store/bookmark-store';
 
-export default function HomeScreen() {
+type SortMode = 'newest' | 'oldest' | 'title' | 'category';
+
+const SORT_OPTIONS: { label: string; value: SortMode }[] = [
+  { label: '최신순', value: 'newest' },
+  { label: '오래된순', value: 'oldest' },
+  { label: '제목순', value: 'title' },
+  { label: '카테고리순', value: 'category' },
+];
+
+export default function BookmarksScreen() {
+  const router = useRouter();
+  const colorScheme = useColorScheme() ?? 'light';
+  const tint = Colors[colorScheme].tint;
+
+  const bookmarks = useBookmarkStore((s) => s.bookmarks);
+  const categories = useBookmarkStore((s) => s.categories);
+  const hasHydrated = useBookmarkStore((s) => s.hasHydrated);
+  const hydrate = useBookmarkStore((s) => s.hydrate);
+
+  const [selectedCat, setSelectedCat] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
+  const [sortMode, setSortMode] = useState<SortMode>('newest');
+
+  useEffect(() => {
+    if (!hasHydrated) {
+      hydrate();
+    }
+  }, [hasHydrated, hydrate]);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const categoryNameById = new Map(categories.map((c) => [c.id, c.name]));
+    const matched = bookmarks.filter((b) => {
+      if (selectedCat && b.categoryId !== selectedCat) return false;
+      if (!q) return true;
+      return (
+        b.title.toLowerCase().includes(q) ||
+        b.url.toLowerCase().includes(q)
+      );
+    });
+
+    return [...matched].sort((a, b) => {
+      if (sortMode === 'oldest') return a.createdAt - b.createdAt;
+      if (sortMode === 'title') return a.title.localeCompare(b.title, 'ko');
+      if (sortMode === 'category') {
+        const categoryCompare = (categoryNameById.get(a.categoryId) ?? '').localeCompare(
+          categoryNameById.get(b.categoryId) ?? '',
+          'ko'
+        );
+        return categoryCompare || a.title.localeCompare(b.title, 'ko');
+      }
+      return b.createdAt - a.createdAt;
+    });
+  }, [bookmarks, categories, query, selectedCat, sortMode]);
+
+  const counts = useMemo(() => {
+    const m: Record<string, number> = {};
+    for (const b of bookmarks) {
+      m[b.categoryId] = (m[b.categoryId] ?? 0) + 1;
+    }
+    return m;
+  }, [bookmarks]);
+
+  if (!hasHydrated) {
+    return (
+      <ThemedView style={styles.center}>
+        <ActivityIndicator />
+      </ThemedView>
+    );
+  }
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
+    <SafeAreaView style={styles.flex} edges={['bottom']}>
+      <ThemedView style={styles.flex}>
+        <View style={styles.header}>
+          <View style={styles.searchBox}>
+            <IconSymbol name="magnifyingglass" size={18} color="#888" />
+            <TextInput
+              value={query}
+              onChangeText={setQuery}
+              placeholder="제목 또는 URL 검색"
+              placeholderTextColor="#888"
+              style={[styles.searchInput, { color: Colors[colorScheme].text }]}
             />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+          </View>
+          <Pressable
+            accessibilityLabel="북마크 추가"
+            onPress={() => router.push('/add')}
+            style={({ pressed }) => [
+              styles.addBtn,
+              { backgroundColor: tint, opacity: pressed ? 0.8 : 1 },
+            ]}>
+            <IconSymbol name="plus" size={22} color="#fff" />
+          </Pressable>
+        </View>
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
+        <FlatList
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          data={[null, ...categories]}
+          keyExtractor={(c, idx) => (c ? c.id : `all-${idx}`)}
+          contentContainerStyle={styles.chipRow}
+          renderItem={({ item }) => (
+            <CategoryChip
+              category={item}
+              count={item ? counts[item.id] ?? 0 : bookmarks.length}
+              selected={item ? selectedCat === item.id : selectedCat === null}
+              onPress={() => setSelectedCat(item ? item.id : null)}
+            />
+          )}
+        />
+
+        <View style={styles.sortRow}>
+          {SORT_OPTIONS.map((option) => {
+            const selected = sortMode === option.value;
+            return (
+              <Pressable
+                key={option.value}
+                onPress={() => setSortMode(option.value)}
+                style={({ pressed }) => [
+                  styles.sortBtn,
+                  {
+                    borderColor: selected ? tint : 'rgba(127,127,127,0.35)',
+                    backgroundColor: selected ? tint : 'transparent',
+                    opacity: pressed ? 0.7 : 1,
+                  },
+                ]}>
+                <ThemedText
+                  style={[
+                    styles.sortText,
+                    { color: selected ? '#fff' : Colors[colorScheme].text },
+                  ]}>
+                  {option.label}
+                </ThemedText>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        <FlatList
+          data={filtered}
+          keyExtractor={(b) => b.id}
+          contentContainerStyle={styles.listContent}
+          ListEmptyComponent={
+            <View style={styles.empty}>
+              <ThemedText type="subtitle">아직 북마크가 없어요</ThemedText>
+              <ThemedText style={styles.emptyHint}>
+                오른쪽 상단 + 버튼으로 첫 북마크를 추가해보세요.
+              </ThemedText>
+            </View>
+          }
+          renderItem={({ item }) => (
+            <BookmarkItem
+              bookmark={item}
+              category={categories.find((c) => c.id === item.categoryId)}
+            />
+          )}
+        />
       </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
+  flex: { flex: 1 },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingTop: 10,
+    paddingBottom: 6,
     gap: 8,
   },
-  stepContainer: {
+  searchBox: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: 'rgba(127,127,127,0.12)',
     gap: 8,
-    marginBottom: 8,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  searchInput: {
+    flex: 1,
+    fontSize: 15,
+    padding: 0,
+  },
+  addBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  chipRow: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  sortRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingBottom: 8,
+  },
+  sortBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  sortText: {
+    fontSize: 12,
+    fontWeight: '600',
+    lineHeight: 16,
+  },
+  listContent: {
+    paddingHorizontal: 14,
+    paddingTop: 4,
+    paddingBottom: 24,
+    flexGrow: 1,
+  },
+  empty: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 32,
+  },
+  emptyHint: {
+    marginTop: 8,
+    color: '#888',
+    textAlign: 'center',
   },
 });
