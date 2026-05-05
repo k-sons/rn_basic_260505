@@ -1,3 +1,5 @@
+import type { CategoryId } from '@/constants/categories';
+
 export type Habit = {
   id: string;
   name: string;
@@ -5,6 +7,7 @@ export type Habit = {
   createdAt: number;
   order: number;
   history: Record<string, boolean>;
+  categoryId?: CategoryId;
 };
 
 export const todayKey = (date: Date = new Date()): string => {

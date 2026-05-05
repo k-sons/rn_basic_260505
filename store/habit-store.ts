@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { DEFAULT_CATEGORY_ID, type CategoryId } from '@/constants/categories';
 import { habitRepository } from '@/repository/habit-repository';
 import { todayKey, type Habit } from '@/types/habit';
 
@@ -6,8 +7,13 @@ type HabitState = {
   habits: Habit[];
   hydrated: boolean;
   hydrate: () => Promise<void>;
-  addHabit: (name: string, emoji: string) => void;
-  updateHabit: (id: string, name: string, emoji: string) => void;
+  addHabit: (name: string, emoji: string, categoryId?: CategoryId) => void;
+  updateHabit: (
+    id: string,
+    name: string,
+    emoji: string,
+    categoryId?: CategoryId
+  ) => void;
   deleteHabit: (id: string) => void;
   toggleToday: (id: string) => void;
   reorderHabits: (orderedIds: string[]) => void;
@@ -26,6 +32,7 @@ const normalizeHabitOrders = (habits: Habit[]) =>
     habits.map((habit, index) => ({
       ...habit,
       order: typeof habit.order === 'number' ? habit.order : index,
+      categoryId: habit.categoryId ?? DEFAULT_CATEGORY_ID,
     }))
   ).map((habit, index) => ({ ...habit, order: index }));
 
@@ -41,7 +48,7 @@ export const useHabitStore = create<HabitState>((set, get) => ({
     }
   },
 
-  addHabit: (name, emoji) => {
+  addHabit: (name, emoji, categoryId) => {
     const habits = get().habits;
     const newHabit: Habit = {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -50,15 +57,23 @@ export const useHabitStore = create<HabitState>((set, get) => ({
       createdAt: Date.now(),
       order: habits.length,
       history: {},
+      categoryId: categoryId ?? DEFAULT_CATEGORY_ID,
     };
     const next = normalizeHabitOrders([...habits, newHabit]);
     set({ habits: next });
     persist(next);
   },
 
-  updateHabit: (id, name, emoji) => {
+  updateHabit: (id, name, emoji, categoryId) => {
     const next = get().habits.map((h) =>
-      h.id === id ? { ...h, name: name.trim(), emoji: emoji || h.emoji } : h
+      h.id === id
+        ? {
+            ...h,
+            name: name.trim(),
+            emoji: emoji || h.emoji,
+            categoryId: categoryId ?? h.categoryId ?? DEFAULT_CATEGORY_ID,
+          }
+        : h
     );
     set({ habits: next });
     persist(next);

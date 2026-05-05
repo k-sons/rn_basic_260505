@@ -1,8 +1,9 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import * as Haptics from 'expo-haptics';
-import { useEffect, type ReactNode } from 'react';
+import { useEffect } from 'react';
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import Animated, {
+  interpolateColor,
   useAnimatedStyle,
   useSharedValue,
   withSequence,
@@ -11,6 +12,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
+import { getCategory } from '@/constants/categories';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { getCurrentStreak, todayKey, type Habit } from '@/types/habit';
@@ -19,14 +21,26 @@ type Props = {
   habit: Habit;
   onToggle: (id: string) => void;
   onEdit: (habit: Habit) => void;
-  dragHandle?: ReactNode;
+  onMoveUp?: (id: string) => void;
+  onMoveDown?: (id: string) => void;
+  canMoveUp?: boolean;
+  canMoveDown?: boolean;
 };
 
-export function HabitItem({ habit, onToggle, onEdit, dragHandle }: Props) {
+export function HabitItem({
+  habit,
+  onToggle,
+  onEdit,
+  onMoveUp,
+  onMoveDown,
+  canMoveUp = false,
+  canMoveDown = false,
+}: Props) {
   const colorScheme = useColorScheme() ?? 'light';
   const palette = Colors[colorScheme];
   const checked = !!habit.history[todayKey()];
   const currentStreak = getCurrentStreak(habit.history);
+  const category = getCategory(habit.categoryId);
 
   const scale = useSharedValue(1);
   const checkProgress = useSharedValue(checked ? 1 : 0);
@@ -40,8 +54,16 @@ export function HabitItem({ habit, onToggle, onEdit, dragHandle }: Props) {
   }));
 
   const checkBoxStyle = useAnimatedStyle(() => ({
-    backgroundColor: checkProgress.value === 1 ? palette.success : 'transparent',
-    borderColor: checkProgress.value === 1 ? palette.success : palette.icon,
+    backgroundColor: interpolateColor(
+      checkProgress.value,
+      [0, 1],
+      ['rgba(0,0,0,0)', palette.success]
+    ),
+    borderColor: interpolateColor(
+      checkProgress.value,
+      [0, 1],
+      [palette.icon, palette.success]
+    ),
     transform: [{ scale: 0.9 + checkProgress.value * 0.1 }],
   }));
 
@@ -68,6 +90,7 @@ export function HabitItem({ habit, onToggle, onEdit, dragHandle }: Props) {
             borderColor: checked ? palette.success : palette.border,
           },
         ]}>
+        <View style={[styles.accent, { backgroundColor: category.color }]} />
         <Pressable
           onPress={handlePress}
           onLongPress={() => onEdit(habit)}
@@ -77,22 +100,61 @@ export function HabitItem({ habit, onToggle, onEdit, dragHandle }: Props) {
           </Animated.View>
 
           <View style={styles.body}>
-            <ThemedText
-              type="defaultSemiBold"
-              style={[styles.title, checked && styles.doneText]}>
-              {habit.emoji}  {habit.name}
-            </ThemedText>
+            <View style={styles.titleRow}>
+              <ThemedText
+                type="defaultSemiBold"
+                style={[styles.title, checked && styles.doneText]}
+                numberOfLines={1}>
+                {habit.emoji}  {habit.name}
+              </ThemedText>
+              <View
+                style={[
+                  styles.badge,
+                  { backgroundColor: category.soft, borderColor: category.color },
+                ]}>
+                <ThemedText style={[styles.badgeText, { color: category.color }]}>
+                  {category.label}
+                </ThemedText>
+              </View>
+            </View>
             <ThemedText
               style={[
                 styles.subText,
                 { color: checked ? palette.success : palette.icon },
               ]}>
-              {checked ? `${currentStreak}일째 연속 달성` : '탭 체크 · 길게 수정 · 핸들 이동'}
+              {checked ? `${currentStreak}일째 연속 달성` : '탭 체크 · 길게 눌러 수정'}
             </ThemedText>
           </View>
         </Pressable>
 
-        {dragHandle ?? <MaterialIcons name="chevron-right" size={22} color={palette.icon} />}
+        <View style={styles.moveCol}>
+          <Pressable
+            onPress={() => onMoveUp?.(habit.id)}
+            disabled={!canMoveUp || !onMoveUp}
+            hitSlop={6}
+            style={({ pressed }) => [
+              styles.moveBtn,
+              {
+                backgroundColor: palette.surfaceAlt,
+                opacity: !canMoveUp ? 0.3 : pressed ? 0.6 : 1,
+              },
+            ]}>
+            <MaterialIcons name="keyboard-arrow-up" size={20} color={palette.icon} />
+          </Pressable>
+          <Pressable
+            onPress={() => onMoveDown?.(habit.id)}
+            disabled={!canMoveDown || !onMoveDown}
+            hitSlop={6}
+            style={({ pressed }) => [
+              styles.moveBtn,
+              {
+                backgroundColor: palette.surfaceAlt,
+                opacity: !canMoveDown ? 0.3 : pressed ? 0.6 : 1,
+              },
+            ]}>
+            <MaterialIcons name="keyboard-arrow-down" size={20} color={palette.icon} />
+          </Pressable>
+        </View>
       </View>
     </Animated.View>
   );
@@ -103,11 +165,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
+    paddingLeft: 18,
     borderRadius: 16,
     marginBottom: 12,
     gap: 14,
     borderWidth: 1,
     elevation: 1,
+    overflow: 'hidden',
+  },
+  accent: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 4,
   },
   pressArea: {
     flex: 1,
@@ -126,8 +197,24 @@ const styles = StyleSheet.create({
   body: {
     flex: 1,
   },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   title: {
     fontSize: 16,
+    flexShrink: 1,
+  },
+  badge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  badgeText: {
+    fontSize: 11,
+    fontWeight: '600',
   },
   subText: {
     fontSize: 12,
@@ -136,5 +223,15 @@ const styles = StyleSheet.create({
   doneText: {
     textDecorationLine: 'line-through',
     opacity: 0.55,
+  },
+  moveCol: {
+    gap: 4,
+  },
+  moveBtn: {
+    width: 32,
+    height: 28,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

@@ -4,6 +4,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   TextInput,
   View,
@@ -12,6 +13,11 @@ import {
 import { ResponsiveContainer } from '@/components/responsive-container';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import {
+  DEFAULT_CATEGORY_ID,
+  HABIT_CATEGORIES,
+  type CategoryId,
+} from '@/constants/categories';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useHabitStore } from '@/store/habit-store';
@@ -36,15 +42,18 @@ export default function HabitFormModal() {
 
   const [name, setName] = useState(editing?.name ?? '');
   const [emoji, setEmoji] = useState(editing?.emoji ?? EMOJI_OPTIONS[0]);
+  const [categoryId, setCategoryId] = useState<CategoryId>(
+    editing?.categoryId ?? DEFAULT_CATEGORY_ID
+  );
 
   const canSave = name.trim().length > 0;
 
   const handleSave = () => {
     if (!canSave) return;
     if (editing) {
-      updateHabit(editing.id, name, emoji);
+      updateHabit(editing.id, name, emoji, categoryId);
     } else {
-      addHabit(name, emoji);
+      addHabit(name, emoji, categoryId);
     }
     router.back();
   };
@@ -61,6 +70,13 @@ export default function HabitFormModal() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}>
         <ResponsiveContainer maxWidth={560}>
+        <ScrollView
+      contentContainerStyle={styles.content}
+      keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}>
+
+
+
         <View style={styles.content}>
           <ThemedText type="title">{editing ? '습관 수정' : '새 습관'}</ThemedText>
 
@@ -79,6 +95,33 @@ export default function HabitFormModal() {
                     },
                   ]}>
                   <ThemedText style={styles.emojiText}>{e}</ThemedText>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          <ThemedText style={[styles.label, { color: palette.icon }]}>카테고리</ThemedText>
+          <View style={styles.categoryRow}>
+            {HABIT_CATEGORIES.map((cat) => {
+              const active = cat.id === categoryId;
+              return (
+                <Pressable
+                  key={cat.id}
+                  onPress={() => setCategoryId(cat.id)}
+                  style={[
+                    styles.categoryChip,
+                    {
+                      backgroundColor: active ? cat.color : cat.soft,
+                      borderColor: active ? cat.color : 'transparent',
+                    },
+                  ]}>
+                  <ThemedText
+                    style={[
+                      styles.categoryChipText,
+                      { color: active ? '#fff' : cat.color },
+                    ]}>
+                    {cat.emoji} {cat.label}
+                  </ThemedText>
                 </Pressable>
               );
             })}
@@ -124,6 +167,7 @@ export default function HabitFormModal() {
             </Pressable>
           )}
         </View>
+        </ScrollView>
         </ResponsiveContainer>
       </KeyboardAvoidingView>
     </ThemedView>
@@ -133,7 +177,7 @@ export default function HabitFormModal() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   content: {
-    flex: 1,
+    paddingBottom: 40, 
     padding: 20,
     gap: 12,
   },
@@ -156,6 +200,21 @@ const styles = StyleSheet.create({
   emojiText: {
     fontSize: 22,
     lineHeight: 26,
+  },
+  categoryRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  categoryChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  categoryChipText: {
+    fontSize: 13,
+    fontWeight: '600',
   },
   input: {
     borderWidth: 1,

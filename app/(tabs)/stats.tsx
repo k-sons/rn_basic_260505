@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ResponsiveContainer } from '@/components/responsive-container';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { HABIT_CATEGORIES, getCategory } from '@/constants/categories';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useHabitStore } from '@/store/habit-store';
@@ -48,6 +49,17 @@ export default function StatsScreen() {
     );
   }, [habits]);
 
+  const categoryStats = useMemo(() => {
+    const key = todayKey();
+    return HABIT_CATEGORIES.map((cat) => {
+      const list = habits.filter((h) => getCategory(h.categoryId).id === cat.id);
+      const total = list.length;
+      const done = list.filter((h) => h.history[key]).length;
+      const rate = total === 0 ? 0 : Math.round((done / total) * 100);
+      return { ...cat, total, done, rate };
+    }).filter((c) => c.total > 0);
+  }, [habits]);
+
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView edges={['top']} style={styles.safe}>
@@ -81,6 +93,46 @@ export default function StatsScreen() {
               </ThemedText>
             </View>
           </View>
+
+          {categoryStats.length > 0 && (
+            <View style={styles.categoryCard}>
+              <ThemedText type="defaultSemiBold" style={styles.chartTitle}>
+                카테고리별 현황
+              </ThemedText>
+              <View style={{ gap: 10 }}>
+                {categoryStats.map((c) => (
+                  <View key={c.id} style={styles.categoryRow}>
+                    <View style={styles.categoryHeader}>
+                      <View
+                        style={[
+                          styles.categoryBadge,
+                          { backgroundColor: c.soft, borderColor: c.color },
+                        ]}>
+                        <ThemedText style={[styles.categoryBadgeText, { color: c.color }]}>
+                          {c.emoji} {c.label}
+                        </ThemedText>
+                      </View>
+                      <ThemedText style={[styles.categoryMeta, { color: palette.icon }]}>
+                        {c.done}/{c.total} · {c.rate}%
+                      </ThemedText>
+                    </View>
+                    <View style={[styles.catTrack, { backgroundColor: palette.border }]}>
+                      <View
+                        style={[
+                          styles.catFill,
+                          {
+                            width: `${Math.max(c.rate, 4)}%`,
+                            backgroundColor: c.color,
+                            opacity: c.rate === 0 ? 0.25 : 1,
+                          },
+                        ]}
+                      />
+                    </View>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
 
           <View style={styles.chartCard}>
             <ThemedText type="defaultSemiBold" style={styles.chartTitle}>
@@ -182,6 +234,42 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(127,127,127,0.08)',
     borderRadius: 14,
     padding: 16,
+  },
+  categoryCard: {
+    backgroundColor: 'rgba(127,127,127,0.08)',
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 20,
+  },
+  categoryRow: {
+    gap: 6,
+  },
+  categoryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  categoryBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  categoryBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  categoryMeta: {
+    fontSize: 12,
+  },
+  catTrack: {
+    height: 6,
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  catFill: {
+    height: '100%',
+    borderRadius: 3,
   },
   chartTitle: { marginBottom: 14 },
   chart: {

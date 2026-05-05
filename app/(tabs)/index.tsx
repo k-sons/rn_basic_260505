@@ -1,12 +1,7 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
-import DraggableFlatList, {
-  ScaleDecorator,
-  ShadowDecorator,
-  type RenderItemParams,
-} from 'react-native-draggable-flatlist';
+import { FlatList, type ListRenderItem, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Celebration } from '@/components/celebration';
@@ -66,31 +61,25 @@ export default function TodayScreen() {
 
   const isAllDone = total > 0 && progress === 100;
 
-  const renderItem = ({ item, drag, isActive }: RenderItemParams<Habit>) => (
-    <ScaleDecorator activeScale={1.04}>
-      <ShadowDecorator>
-        <HabitItem
-          habit={item}
-          onToggle={toggleToday}
-          onEdit={handleEdit}
-          dragHandle={
-            <Pressable
-              onPressIn={drag}
-              disabled={isActive}
-              hitSlop={8}
-              style={({ pressed }) => [
-                styles.dragHandle,
-                {
-                  backgroundColor: palette.surfaceAlt,
-                  opacity: pressed || isActive ? 0.6 : 1,
-                },
-              ]}>
-              <MaterialIcons name="drag-indicator" size={22} color={palette.icon} />
-            </Pressable>
-          }
-        />
-      </ShadowDecorator>
-    </ScaleDecorator>
+  const moveItem = (id: string, dir: -1 | 1) => {
+    const ids = orderedHabits.map((h) => h.id);
+    const idx = ids.indexOf(id);
+    const swap = idx + dir;
+    if (idx < 0 || swap < 0 || swap >= ids.length) return;
+    [ids[idx], ids[swap]] = [ids[swap], ids[idx]];
+    reorderHabits(ids);
+  };
+
+  const renderItem: ListRenderItem<Habit> = ({ item, index }) => (
+    <HabitItem
+      habit={item}
+      onToggle={toggleToday}
+      onEdit={handleEdit}
+      onMoveUp={(id) => moveItem(id, -1)}
+      onMoveDown={(id) => moveItem(id, 1)}
+      canMoveUp={index > 0}
+      canMoveDown={index < orderedHabits.length - 1}
+    />
   );
 
   return (
@@ -133,15 +122,13 @@ export default function TodayScreen() {
             />
           </View>
 
-          <DraggableFlatList
+          <FlatList
             data={orderedHabits}
             keyExtractor={(item) => item.id}
+            style={styles.listBody}
             contentContainerStyle={styles.list}
-            activationDistance={8}
-            onDragEnd={({ data }) => {
-              reorderHabits(data.map((habit) => habit.id));
-            }}
             renderItem={renderItem}
+            showsVerticalScrollIndicator={false}
             ListEmptyComponent={
               <View style={styles.empty}>
                 <View
@@ -220,6 +207,9 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
     flexGrow: 1,
   },
+  listBody: {
+    flex: 1,
+  },
   empty: {
     flex: 1,
     alignItems: 'center',
@@ -261,12 +251,5 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '600',
     fontSize: 14,
-  },
-  dragHandle: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
 });
