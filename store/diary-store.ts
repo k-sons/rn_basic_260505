@@ -1,4 +1,3 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 
 import { deleteDiaryImageFileIfOwned } from '@/lib/delete-diary-image';
@@ -7,6 +6,7 @@ import {
   parseDiaryStorage,
   stringifyDiaryDocument,
 } from '@/lib/diary-format';
+import { loadDiaryPayload, saveDiaryPayload } from '@/lib/diary-kv-storage';
 import {
   DIARY_STORAGE_FORMAT_VERSION,
   type DiaryEntry,
@@ -26,7 +26,7 @@ type DiaryState = {
 
 async function writeStorage(entries: DiaryMap): Promise<PersistResult> {
   try {
-    await AsyncStorage.setItem(STORAGE_KEY, stringifyDiaryDocument(entries));
+    await saveDiaryPayload(STORAGE_KEY, stringifyDiaryDocument(entries));
     return { ok: true };
   } catch (e) {
     const error = e instanceof Error ? e : new Error(String(e));
@@ -40,7 +40,7 @@ export const useDiaryStore = create<DiaryState>((set, get) => ({
 
   hydrate: async () => {
     try {
-      const raw = await AsyncStorage.getItem(STORAGE_KEY);
+      const raw = await loadDiaryPayload(STORAGE_KEY);
       const entries = parseDiaryStorage(raw);
       set({ entries, hydrated: true });
 

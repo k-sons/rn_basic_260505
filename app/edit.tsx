@@ -21,6 +21,7 @@ import { downscaleDiaryImageUri } from '@/lib/downscale-diary-image';
 import { isValidDateKey, parseDateKey, toDateKey } from '@/lib/date-key';
 import { ensureGalleryPermission } from '@/lib/gallery-permission';
 import { ensurePersistableUri, persistPickedImage } from '@/lib/persist-image';
+import { compressDataUrlForDiary } from '@/lib/web-compress-diary-image';
 import { useDiaryStore } from '@/store/diary-store';
 
 type PickedPreview = { uri: string; width?: number; height?: number };
@@ -122,15 +123,11 @@ export default function EditDiaryScreen() {
       if (picked?.uri.trim()) {
         const { uri: pu, width: iw, height: ih } = picked;
         const rawPick = pu.trim();
-        const resizedNative =
-          Platform.OS !== 'web'
-            ? await downscaleDiaryImageUri(rawPick, iw, ih)
-            : rawPick;
-        const stableUri =
+        const processedUri =
           Platform.OS === 'web'
-            ? await ensurePersistableUri(rawPick)
-            : resizedNative;
-        imageUri = await persistPickedImage(stableUri, dateKey);
+            ? await compressDataUrlForDiary(await ensurePersistableUri(rawPick))
+            : await downscaleDiaryImageUri(rawPick, iw, ih);
+        imageUri = await persistPickedImage(processedUri, dateKey);
       }
 
       const result = await setEntry(dateKey, {
@@ -203,7 +200,7 @@ export default function EditDiaryScreen() {
         <ThemedText type="subtitle">{formatted}</ThemedText>
         <ThemedText style={[styles.hint, { color: palette.icon }]}>
           {Platform.OS === 'web'
-            ? '웹에서는 선택한 이미지를 data URL로 저장합니다. 용량이 크면 브라우저 저장소 부담이 커질 수 있어요.'
+            ? '웹에서는 사진을 JPEG로 줄여 data URL로 저장하고, 데이터는 IndexedDB에 두어 localStorage 한도를 피합니다. 서브경로 배포 시에는 base 설정을 맞춰 주세요.'
             : '선택한 사진은 앱 저장 공간으로 복사해 두어 재실행 후에도 안정적으로 불러옵니다.'}
         </ThemedText>
         {Platform.OS === 'android' ? (
