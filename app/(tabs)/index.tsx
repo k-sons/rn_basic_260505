@@ -1,98 +1,136 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import * as Haptics from 'expo-haptics';
+import { router } from 'expo-router';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Platform, Pressable, StyleSheet, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
+import { DiaryDayCard } from '@/components/diary-day-card';
+import { SwipeableDiaryCard } from '@/components/swipeable-diary-card';
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+import { Colors } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { addDaysToKey, parseDateKey, toDateKey } from '@/lib/date-key';
+import { useDiaryStore } from '@/store/diary-store';
 
-export default function HomeScreen() {
+export default function DiaryHomeScreen() {
+  const scheme = useColorScheme() ?? 'light';
+  const tint = Colors[scheme].tint;
+
+  const hydrated = useDiaryStore((s) => s.hydrated);
+  const hydrate = useDiaryStore((s) => s.hydrate);
+  const entries = useDiaryStore((s) => s.entries);
+
+  const [dateKey, setDateKey] = useState(() => toDateKey(new Date()));
+
+  useEffect(() => {
+    void hydrate();
+  }, [hydrate]);
+
+  const entry = entries[dateKey];
+
+  const dateLabel = useMemo(() => {
+    const dt = parseDateKey(dateKey);
+    if (!dt) return dateKey;
+    return dt.toLocaleDateString('ko-KR', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+  }, [dateKey]);
+
+  const bumpDay = useCallback(
+    (delta: number) => {
+      if (Platform.OS !== 'web') {
+        void Haptics.selectionAsync();
+      }
+      setDateKey((k) => addDaysToKey(k, delta));
+    },
+    [setDateKey],
+  );
+
+  const onSwipeLeft = useCallback(() => bumpDay(1), [bumpDay]);
+  const onSwipeRight = useCallback(() => bumpDay(-1), [bumpDay]);
+
+  const openEdit = useCallback(() => {
+    router.push({ pathname: '/edit', params: { date: dateKey } });
+  }, [dateKey]);
+
+  if (!hydrated) {
+    return (
+      <SafeAreaView style={[styles.safe, { backgroundColor: Colors[scheme].background }]}>
+        <View style={styles.center}>
+          <ThemedText>불러오는 중…</ThemedText>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
+    <SafeAreaView style={[styles.safe, { backgroundColor: Colors[scheme].background }]} edges={['top', 'bottom']}>
+      <View style={styles.header}>
+        <ThemedText type="title" style={styles.headerTitle}>
+          오늘의 한 장
         </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+        <ThemedText style={[styles.headerSub, { color: Colors[scheme].icon }]}>
+          카드를 좌우로 스와이프해 날짜를 바꿔 보세요.
+        </ThemedText>
+      </View>
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+      <SwipeableDiaryCard onSwipeLeft={onSwipeLeft} onSwipeRight={onSwipeRight}>
+        <DiaryDayCard dateLabel={dateLabel} entry={entry} />
+      </SwipeableDiaryCard>
+
+      <View style={styles.footer}>
+        <Pressable
+          onPress={openEdit}
+          style={({ pressed }) => [
+            styles.primaryBtn,
+            { backgroundColor: tint, opacity: pressed ? 0.85 : 1 },
+          ]}>
+          <ThemedText style={[styles.primaryBtnText, { color: scheme === 'dark' ? '#111' : '#fff' }]}>
+            이 날짜 편집
+          </ThemedText>
+        </Pressable>
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
+  safe: {
+    flex: 1,
+  },
+  center: {
+    flex: 1,
     alignItems: 'center',
-    gap: 8,
+    justifyContent: 'center',
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  header: {
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 4,
+    gap: 6,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  headerTitle: {
+    fontSize: 26,
+  },
+  headerSub: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  footer: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+  },
+  primaryBtn: {
+    paddingVertical: 14,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  primaryBtnText: {
+    fontSize: 17,
+    fontWeight: '700',
   },
 });
