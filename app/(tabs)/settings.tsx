@@ -2,6 +2,7 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { Alert, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { ResponsiveContainer } from '@/components/responsive-container';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors } from '@/constants/theme';
@@ -30,6 +31,7 @@ export default function SettingsScreen() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView edges={['top']} style={styles.safe}>
+        <ResponsiveContainer>
         <View style={styles.content}>
           <ThemedText type="title">설정</ThemedText>
 
@@ -70,6 +72,7 @@ export default function SettingsScreen() {
             />
           </View>
         </View>
+        </ResponsiveContainer>
       </SafeAreaView>
     </ThemedView>
   );

@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { ResponsiveContainer } from '@/components/responsive-container';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors } from '@/constants/theme';
@@ -40,6 +41,7 @@ export default function StatsScreen() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView edges={['top']} style={styles.safe}>
+        <ResponsiveContainer>
         <ScrollView contentContainerStyle={styles.content}>
           <ThemedText type="title">통계</ThemedText>
           <ThemedText style={[styles.sub, { color: palette.icon }]}>최근 7일 달성률</ThemedText>
@@ -84,6 +86,7 @@ export default function StatsScreen() {
             </ThemedText>
           )}
         </ScrollView>
+        </ResponsiveContainer>
       </SafeAreaView>
     </ThemedView>
   );

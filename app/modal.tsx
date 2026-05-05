@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 
+import { ResponsiveContainer } from '@/components/responsive-container';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors } from '@/constants/theme';
@@ -59,6 +60,7 @@ export default function HabitFormModal() {
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}>
+        <ResponsiveContainer maxWidth={560}>
         <View style={styles.content}>
           <ThemedText type="title">{editing ? '습관 수정' : '새 습관'}</ThemedText>
 
@@ -122,6 +124,7 @@ export default function HabitFormModal() {
             </Pressable>
           )}
         </View>
+        </ResponsiveContainer>
       </KeyboardAvoidingView>
     </ThemedView>
   );

@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Celebration } from '@/components/celebration';
 import { HabitItem } from '@/components/habit-item';
+import { ResponsiveContainer } from '@/components/responsive-container';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors } from '@/constants/theme';
@@ -58,6 +59,7 @@ export default function TodayScreen() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView edges={['top']} style={styles.safe}>
+        <ResponsiveContainer style={styles.inner}>
         <View style={styles.header}>
           <View style={{ flex: 1 }}>
             <ThemedText type="title">오늘의 습관</ThemedText>
@@ -128,6 +130,7 @@ export default function TodayScreen() {
             </View>
           }
         />
+        </ResponsiveContainer>
       </SafeAreaView>
 
       <Celebration visible={celebrate} onDone={() => setCelebrate(false)} />
@@ -141,6 +144,8 @@ const styles = StyleSheet.create({
   },
   safe: {
     flex: 1,
+  },
+  inner: {
     paddingHorizontal: 16,
   },
   header: {
