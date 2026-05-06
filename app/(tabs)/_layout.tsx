@@ -23,6 +23,13 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="book.fill" color={color} />,
         }}
       />
+      <Tabs.Screen
+        name="entries"
+        options={{
+          title: '목록',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="calendar" color={color} />,
+        }}
+      />
     </Tabs>
   );
 }

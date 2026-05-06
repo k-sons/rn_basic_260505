@@ -16,9 +16,15 @@ export async function downscaleDiaryImageUri(
   if (Platform.OS === 'web') {
     return uri;
   }
+  if (widthHint == null || heightHint == null) {
+    return uri;
+  }
+  const longestEdge = Math.max(widthHint, heightHint);
+  if (longestEdge <= MAX_EDGE_PX) {
+    return uri;
+  }
   try {
-    const useHeight =
-      widthHint != null && heightHint != null && heightHint > widthHint;
+    const useHeight = heightHint > widthHint;
     const resize = useHeight ? { height: MAX_EDGE_PX } : { width: MAX_EDGE_PX };
     const { uri: out } = await manipulateAsync(uri, [{ resize }], {
       compress: 0.82,

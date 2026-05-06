@@ -22,6 +22,7 @@ type DiaryState = {
   hydrate: () => Promise<void>;
   setEntry: (dateKey: string, entry: DiaryEntry) => Promise<PersistResult>;
   removeEntry: (dateKey: string) => Promise<PersistResult>;
+  replaceEntries: (entries: DiaryMap) => Promise<PersistResult>;
 };
 
 async function writeStorage(entries: DiaryMap): Promise<PersistResult> {
@@ -103,6 +104,19 @@ export const useDiaryStore = create<DiaryState>((set, get) => ({
     }
 
     await deleteDiaryImageFileIfOwned(prev.imageUri);
+    return { ok: true };
+  },
+
+  replaceEntries: async (entries) => {
+    const snapshot = get().entries;
+    set({ entries });
+
+    const persisted = await writeStorage(entries);
+    if (!persisted.ok) {
+      set({ entries: snapshot });
+      return persisted;
+    }
+
     return { ok: true };
   },
 }));

@@ -158,8 +158,32 @@ export default function EditDiaryScreen() {
     }
   }, [dateKey, memo, picked, router, setEntry]);
 
+  const deleteSaved = useCallback(async () => {
+    setIsSaving(true);
+    try {
+      const result = await removeEntry(dateKey);
+      if (!result.ok) {
+        Alert.alert(
+          '삭제 실패',
+          result.error.message ?? '잠시 후 다시 시도해 주세요.',
+        );
+        return;
+      }
+      router.back();
+    } finally {
+      setIsSaving(false);
+    }
+  }, [dateKey, removeEntry, router]);
+
   const confirmDeleteSaved = useCallback(() => {
     if (!hasSavedEntry || isSaving) return;
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      if (window.confirm('이 날짜에 저장된 일기를 삭제할까요? 편집 중인 내용도 함께 버려지며 되돌릴 수 없습니다.')) {
+        void deleteSaved();
+      }
+      return;
+    }
+
     Alert.alert(
       '일기 삭제',
       '이 날짜에 저장된 일기를 삭제할까요? 편집 중인 내용도 함께 버려지며 되돌릴 수 없습니다.',
@@ -169,27 +193,12 @@ export default function EditDiaryScreen() {
           text: '삭제',
           style: 'destructive',
           onPress: () => {
-            void (async () => {
-              setIsSaving(true);
-              try {
-                const result = await removeEntry(dateKey);
-                if (!result.ok) {
-                  Alert.alert(
-                    '삭제 실패',
-                    result.error.message ?? '잠시 후 다시 시도해 주세요.',
-                  );
-                  return;
-                }
-                router.back();
-              } finally {
-                setIsSaving(false);
-              }
-            })();
+            void deleteSaved();
           },
         },
       ],
     );
-  }, [dateKey, hasSavedEntry, isSaving, removeEntry, router]);
+  }, [deleteSaved, hasSavedEntry, isSaving]);
 
   const primaryLabelColor = scheme === 'dark' ? '#111' : '#fff';
   const destructive = scheme === 'dark' ? '#ff8a80' : '#c62828';
@@ -211,6 +220,9 @@ export default function EditDiaryScreen() {
 
         <View style={styles.pickRow}>
           <Pressable
+            accessibilityHint="기기 갤러리에서 일기에 넣을 사진을 고릅니다."
+            accessibilityLabel={`${formatted}에 넣을 사진 선택하기`}
+            accessibilityRole="button"
             disabled={isSaving}
             onPress={pickImage}
             style={({ pressed }) => [
@@ -223,7 +235,13 @@ export default function EditDiaryScreen() {
             <ThemedText type="defaultSemiBold">사진 선택</ThemedText>
           </Pressable>
           {picked ? (
-            <Pressable disabled={isSaving} onPress={() => setPicked(null)} hitSlop={8}>
+            <Pressable
+              accessibilityHint="현재 선택된 사진을 저장 대상에서 제거합니다."
+              accessibilityLabel={`${formatted} 사진 제거하기`}
+              accessibilityRole="button"
+              disabled={isSaving}
+              onPress={() => setPicked(null)}
+              hitSlop={8}>
               <ThemedText style={[styles.removePhoto, { color: palette.tint, opacity: isSaving ? 0.45 : 1 }]}>
                 사진 제거
               </ThemedText>
@@ -233,7 +251,13 @@ export default function EditDiaryScreen() {
 
         {picked ? (
           <View style={[styles.previewWrap, { backgroundColor: scheme === 'dark' ? '#121518' : '#e8ecf0' }]}>
-            <Image source={{ uri: picked.uri }} style={styles.preview} contentFit="cover" transition={120} />
+            <Image
+              accessibilityLabel={`${formatted} 일기 사진 미리보기`}
+              source={{ uri: picked.uri }}
+              style={styles.preview}
+              contentFit="cover"
+              transition={120}
+            />
           </View>
         ) : null}
 
@@ -241,6 +265,8 @@ export default function EditDiaryScreen() {
           메모
         </ThemedText>
         <TextInput
+          accessibilityHint="짧은 일기 메모를 여러 줄로 입력할 수 있습니다."
+          accessibilityLabel={`${formatted} 일기 메모 입력`}
           editable={!isSaving}
           value={memo}
           onChangeText={setMemo}
@@ -259,6 +285,9 @@ export default function EditDiaryScreen() {
         />
 
         <Pressable
+          accessibilityHint="현재 사진과 메모를 이 날짜의 일기로 저장합니다."
+          accessibilityLabel={`${formatted} 일기 저장하기`}
+          accessibilityRole="button"
           disabled={isSaving}
           onPress={() => void save()}
           style={({ pressed }) => [
@@ -275,6 +304,9 @@ export default function EditDiaryScreen() {
 
         {hasSavedEntry ? (
           <Pressable
+            accessibilityHint="이 날짜에 저장된 일기를 삭제합니다."
+            accessibilityLabel={`${formatted} 저장된 일기 삭제하기`}
+            accessibilityRole="button"
             disabled={isSaving}
             onPress={confirmDeleteSaved}
             style={({ pressed }) => [
@@ -310,6 +342,7 @@ const styles = StyleSheet.create({
   },
   secondaryBtn: {
     alignSelf: 'flex-start',
+    minHeight: 44,
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 12,
@@ -342,6 +375,7 @@ const styles = StyleSheet.create({
   },
   primaryBtn: {
     marginTop: 16,
+    minHeight: 48,
     paddingVertical: 14,
     borderRadius: 14,
     alignItems: 'center',
@@ -351,8 +385,10 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   deleteBtn: {
+    minHeight: 44,
     paddingVertical: 12,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   deleteBtnText: {
     fontSize: 16,

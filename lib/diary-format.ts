@@ -1,7 +1,8 @@
+import { isValidDateKey } from '@/lib/date-key';
 import { DIARY_STORAGE_FORMAT_VERSION, type DiaryMap } from '@/types/diary';
 
 function isDateKey(key: string): boolean {
-  return /^\d{4}-\d{2}-\d{2}$/.test(key);
+  return isValidDateKey(key);
 }
 
 function normalizeEntry(value: unknown): { imageUri: string; memo: string } | null {

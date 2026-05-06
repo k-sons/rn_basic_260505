@@ -1,7 +1,7 @@
 import * as Haptics from 'expo-haptics';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, AppState, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { Alert, AppState, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { DiaryDayCard } from '@/components/diary-day-card';
@@ -9,7 +9,7 @@ import { SwipeableDiaryCard } from '@/components/swipeable-diary-card';
 import { ThemedText } from '@/components/themed-text';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { addDaysToKey, parseDateKey, toDateKey } from '@/lib/date-key';
+import { addDaysToKey, isValidDateKey, parseDateKey, toDateKey } from '@/lib/date-key';
 import { useDiaryStore } from '@/store/diary-store';
 
 export default function DiaryHomeScreen() {
@@ -22,11 +22,19 @@ export default function DiaryHomeScreen() {
   const entries = useDiaryStore((s) => s.entries);
   const removeEntry = useDiaryStore((s) => s.removeEntry);
 
+  const rawDate = useLocalSearchParams<{ date?: string | string[] }>().date;
+  const dateParam = Array.isArray(rawDate) ? rawDate[0] : rawDate;
   const [dateKey, setDateKey] = useState(() => toDateKey(new Date()));
 
   useEffect(() => {
     void hydrate();
   }, [hydrate]);
+
+  useEffect(() => {
+    if (dateParam && isValidDateKey(dateParam)) {
+      setDateKey(dateParam);
+    }
+  }, [dateParam]);
 
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state) => {
@@ -69,24 +77,33 @@ export default function DiaryHomeScreen() {
 
   const canDelete = Boolean(entry && (entry.memo.trim() || entry.imageUri.trim()));
 
+  const deleteDay = useCallback(async () => {
+    const result = await removeEntry(dateKey);
+    if (!result.ok) {
+      Alert.alert('삭제 실패', result.error.message ?? '잠시 후 다시 시도해 주세요.');
+    }
+  }, [dateKey, removeEntry]);
+
   const confirmDeleteDay = useCallback(() => {
     if (!canDelete) return;
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      if (window.confirm('이 날짜의 저장된 일기를 삭제할까요? 되돌릴 수 없습니다.')) {
+        void deleteDay();
+      }
+      return;
+    }
+
     Alert.alert('일기 삭제', '이 날짜의 저장된 일기를 삭제할까요? 되돌릴 수 없습니다.', [
       { text: '취소', style: 'cancel', onPress: () => {} },
       {
         text: '삭제',
         style: 'destructive',
         onPress: () => {
-          void (async () => {
-            const result = await removeEntry(dateKey);
-            if (!result.ok) {
-              Alert.alert('삭제 실패', result.error.message ?? '잠시 후 다시 시도해 주세요.');
-            }
-          })();
+          void deleteDay();
         },
       },
     ]);
-  }, [canDelete, dateKey, removeEntry]);
+  }, [canDelete, deleteDay]);
 
   if (!hydrated) {
     return (
@@ -100,37 +117,49 @@ export default function DiaryHomeScreen() {
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: Colors[scheme].background }]} edges={['top', 'bottom']}>
-      <View style={styles.header}>
-        <ThemedText type="title" style={styles.headerTitle}>
-          오늘의 한 장
-        </ThemedText>
-        <ThemedText style={[styles.headerSub, { color: Colors[scheme].icon }]}>
-          카드를 좌우로 스와이프해 날짜를 바꿔 보세요.
-        </ThemedText>
-      </View>
-
-      <SwipeableDiaryCard onSwipeLeft={onSwipeLeft} onSwipeRight={onSwipeRight}>
-        <DiaryDayCard dateLabel={dateLabel} entry={entry} />
-      </SwipeableDiaryCard>
-
-      <View style={styles.footer}>
-        <Pressable
-          onPress={openEdit}
-          style={({ pressed }) => [
-            styles.primaryBtn,
-            { backgroundColor: tint, opacity: pressed ? 0.85 : 1 },
-          ]}>
-          <ThemedText style={[styles.primaryBtnText, { color: scheme === 'dark' ? '#111' : '#fff' }]}>
-            이 날짜 편집
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <View style={styles.header}>
+          <ThemedText type="title" style={styles.headerTitle}>
+            오늘의 한 장
           </ThemedText>
-        </Pressable>
+          <ThemedText style={[styles.headerSub, { color: Colors[scheme].icon }]}>
+            카드를 좌우로 스와이프해 날짜를 바꿔 보세요.
+          </ThemedText>
+        </View>
 
-        {canDelete ? (
-          <Pressable onPress={confirmDeleteDay} style={styles.deleteLink}>
-            <ThemedText style={[styles.deleteLinkText, { color: destructive }]}>이 날 일기 삭제</ThemedText>
+        <View style={styles.cardArea}>
+          <SwipeableDiaryCard onSwipeLeft={onSwipeLeft} onSwipeRight={onSwipeRight}>
+            <DiaryDayCard dateLabel={dateLabel} entry={entry} />
+          </SwipeableDiaryCard>
+        </View>
+
+        <View style={styles.footer}>
+          <Pressable
+            accessibilityHint="선택한 날짜의 사진과 메모를 추가하거나 수정합니다."
+            accessibilityLabel={`${dateLabel} 일기 편집하기`}
+            accessibilityRole="button"
+            onPress={openEdit}
+            style={({ pressed }) => [
+              styles.primaryBtn,
+              { backgroundColor: tint, opacity: pressed ? 0.85 : 1 },
+            ]}>
+            <ThemedText style={[styles.primaryBtnText, { color: scheme === 'dark' ? '#111' : '#fff' }]}>
+              이 날짜 편집
+            </ThemedText>
           </Pressable>
-        ) : null}
-      </View>
+
+          {canDelete ? (
+            <Pressable
+              accessibilityHint="선택한 날짜의 사진과 메모를 모두 삭제합니다."
+              accessibilityLabel={`${dateLabel} 일기 삭제하기`}
+              accessibilityRole="button"
+              onPress={confirmDeleteDay}
+              style={styles.deleteLink}>
+              <ThemedText style={[styles.deleteLinkText, { color: destructive }]}>이 날 일기 삭제</ThemedText>
+            </Pressable>
+          ) : null}
+        </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -144,11 +173,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  scrollContent: {
+    flexGrow: 1,
+  },
   header: {
     paddingHorizontal: 20,
-    paddingTop: 8,
+    paddingTop: 6,
     paddingBottom: 4,
-    gap: 6,
+    gap: 4,
   },
   headerTitle: {
     fontSize: 26,
@@ -157,12 +189,18 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
   },
+  cardArea: {
+    flexGrow: 1,
+    minHeight: 360,
+  },
   footer: {
     paddingHorizontal: 20,
-    paddingVertical: 16,
-    gap: 12,
+    paddingTop: 10,
+    paddingBottom: 12,
+    gap: 8,
   },
   primaryBtn: {
+    minHeight: 48,
     paddingVertical: 14,
     borderRadius: 14,
     alignItems: 'center',
@@ -174,6 +212,8 @@ const styles = StyleSheet.create({
   },
   deleteLink: {
     alignItems: 'center',
+    minHeight: 44,
+    justifyContent: 'center',
     paddingVertical: 8,
   },
   deleteLinkText: {

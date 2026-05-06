@@ -1,5 +1,5 @@
 import { Image } from 'expo-image';
-import { StyleSheet, View } from 'react-native';
+import { Platform, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { Colors } from '@/constants/theme';
@@ -13,11 +13,18 @@ type Props = {
 
 export function DiaryDayCard({ dateLabel, entry }: Props) {
   const scheme = useColorScheme() ?? 'light';
+  const { height, width } = useWindowDimensions();
   const palette = Colors[scheme];
   const cardBg = scheme === 'dark' ? '#1e2326' : '#f4f6f8';
   const border = scheme === 'dark' ? '#2c3238' : '#dde3e8';
 
   const hasImage = Boolean(entry?.imageUri?.trim());
+  const imageHeight =
+    Platform.OS === 'web'
+      ? Math.min(300, Math.max(160, Math.round(Math.min(width * 0.28, height * 0.34))))
+      : height < 720
+        ? 148
+        : 188;
 
   return (
     <View style={[styles.card, { backgroundColor: cardBg, borderColor: border }]}>
@@ -25,12 +32,20 @@ export function DiaryDayCard({ dateLabel, entry }: Props) {
         {dateLabel}
       </ThemedText>
 
-      <View style={[styles.imageWrap, { backgroundColor: scheme === 'dark' ? '#121518' : '#e8ecf0' }]}>
+      <View
+        style={[
+          styles.imageWrap,
+          {
+            backgroundColor: scheme === 'dark' ? '#121518' : '#e8ecf0',
+            height: imageHeight,
+          },
+        ]}>
         {hasImage ? (
           <Image
+            accessibilityLabel={`${dateLabel} 일기 사진`}
             source={{ uri: entry!.imageUri }}
             style={styles.image}
-            contentFit="cover"
+            contentFit={Platform.OS === 'web' ? 'contain' : 'cover'}
             transition={160}
             cachePolicy="memory-disk"
           />
@@ -60,11 +75,16 @@ export function DiaryDayCard({ dateLabel, entry }: Props) {
 
 const styles = StyleSheet.create({
   card: {
+    width: '100%',
+    maxWidth: 760,
+    alignSelf: 'center',
     borderRadius: 20,
     borderWidth: 1,
-    padding: 20,
+    padding: 18,
     marginHorizontal: 16,
-    maxHeight: '88%',
+    maxHeight: '100%',
+    flexShrink: 1,
+    overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.12,
@@ -78,7 +98,6 @@ const styles = StyleSheet.create({
   imageWrap: {
     borderRadius: 14,
     overflow: 'hidden',
-    aspectRatio: 4 / 3,
     justifyContent: 'center',
   },
   image: {

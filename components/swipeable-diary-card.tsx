@@ -44,7 +44,7 @@ export function SwipeableDiaryCard({ children, onSwipeLeft, onSwipeRight }: Prop
 
   return (
     <GestureDetector gesture={pan}>
-      <Animated.View style={[{ flex: 1, justifyContent: 'center' }, animatedStyle]}>
+      <Animated.View style={[{ flex: 1, justifyContent: 'flex-start', paddingTop: 8 }, animatedStyle]}>
         {children}
       </Animated.View>
     </GestureDetector>
