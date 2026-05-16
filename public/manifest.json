@@ -1,0 +1,11 @@
+{
+  "name": "Photo Memo Diary",
+  "short_name": "Diary",
+  "description": "날짜별 사진 한 장과 짧은 메모를 저장하는 일기 앱",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#0a7ea4",
+  "orientation": "portrait"
+}
